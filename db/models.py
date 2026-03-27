@@ -360,11 +360,24 @@ class Usuario(Base):
 def get_engine():
     url = os.getenv("DATABASE_URL")
     if not url:
+        try:
+            import streamlit as st
+            url = st.secrets["DATABASE_URL"]
+        except Exception:
+            pass
+    if not url:
         raise ValueError(
             "Variável DATABASE_URL não encontrada.\n"
             "Verifique o arquivo .env na raiz do projeto."
         )
     return create_engine(url, pool_pre_ping=True)
+```
+
+Salve, faça o commit e push:
+```
+git add db/models.py
+git commit -m "fix: ler DATABASE_URL dos secrets do Streamlit Cloud"
+git push
 
 
 def get_session():
