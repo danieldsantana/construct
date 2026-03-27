@@ -1,0 +1,29 @@
+# Ambiente virtual
+venv/
+
+# Variáveis de ambiente
+.env
+
+# Dados e planilhas
+data/
+
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+.Python
+
+# IDEs
+.vscode/
+.idea/
+*.sublime-project
+*.sublime-workspace
+
+# OS
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Streamlit
+.streamlit/secrets.toml
