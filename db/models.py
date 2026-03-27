@@ -371,13 +371,6 @@ def get_engine():
             "Verifique o arquivo .env na raiz do projeto."
         )
     return create_engine(url, pool_pre_ping=True)
-```
-
-Salve, faça o commit e push:
-```
-git add db/models.py
-git commit -m "fix: ler DATABASE_URL dos secrets do Streamlit Cloud"
-git push
 
 
 def get_session():
