@@ -17,3 +17,7 @@ button[aria-pressed="true"] { background: var(--cor-acento); color: var(--cor-fu
 .torres-tabela { overflow: auto; max-height: calc(100vh - 260px); border-top: 1px solid var(--cor-linha); }
 .torres-tabela tbody tr:hover { background: var(--cor-superficie); }
 .torres-tabela .ref { text-decoration: underline; text-underline-offset: 3px; }
+.torres-tabela tr.ancoragem td { border-top: 2px solid var(--cor-acento); }
+.torres-tabela .marca { margin-left: var(--esp-2); font-size: var(--tam-1); padding: 0 var(--esp-1); border: 1px solid var(--cor-linha); }
+.torres-tabela button.tramo { padding: 0 var(--esp-2); border-color: transparent; background: transparent; font-family: var(--fonte-dados); }
+.torres-tabela button.tramo:hover { border-color: var(--cor-linha); }

@@ -11,11 +11,12 @@ export function Torres() {
   const canteiro = params.get('canteiro') ?? '';
   const tipos = (params.get('tipos') ?? '').split(',').filter(Boolean);
   const busca = params.get('q') ?? '';
+  const tramo = params.get('tramo') ?? '';
 
   function mudar(chave: string, valor: string) {
     const p = new URLSearchParams(params);
     if (valor) p.set(chave, valor); else p.delete(chave);
-    if (chave === 'linha') p.delete('canteiro');
+    if (chave === 'linha') { p.delete('canteiro'); p.delete('tramo'); }
     setParams(p, { replace: true });
   }
 
@@ -40,8 +41,11 @@ export function Torres() {
   }, [doRecorte]);
   const visiveis = useMemo(() => {
     const q = busca.trim().toLowerCase();
-    return doRecorte.filter((t) => (tipos.length === 0 || tipos.includes(t.tipo)) && (!q || t.numero.startsWith(q)));
-  }, [doRecorte, tipos, busca]);
+    return doRecorte.filter((t) =>
+      (tipos.length === 0 || tipos.includes(t.tipo)) &&
+      (!q || t.numero.startsWith(q)) &&
+      (!tramo || `${t.linha_sigla}-${t.tramo}` === tramo));
+  }, [doRecorte, tipos, busca, tramo]);
 
   if (carregando) return <p className="suave">Carregando torres…</p>;
   if (erro) return <p className="erro">Não foi possível carregar as torres: {erro}</p>;
@@ -75,18 +79,25 @@ export function Torres() {
           </button>
         ))}
         {tipos.length > 0 && <button className="limpar" onClick={() => mudar('tipos', '')}>Limpar tipos</button>}
+        {tramo && (
+          <button className="limpar" onClick={() => mudar('tramo', '')}>
+            Tramo {tramo.split('-')[1]} de {tramo.split('-')[0]} ✕
+          </button>
+        )}
       </div>
 
       <div className="torres-tabela">
         <table>
           <thead>
             <tr>
-              <th>Linha</th><th>Torre</th><th>Tipo</th><th className="num">Altura (m)</th>
+              <th>Linha</th><th className="num">Tramo</th><th>Torre</th><th>Tipo</th><th className="num">Altura (m)</th>
               <th className="num">Extensão</th><th>Pernas A/B/C/D</th><th>Canteiro</th>
             </tr>
           </thead>
           <tbody>
-            {visiveis.map((t) => <Linha key={t.id} t={t} />)}
+            {visiveis.map((t) => (
+              <Linha key={t.id} t={t} aoEscolherTramo={() => mudar('tramo', `${t.linha_sigla}-${t.tramo}`)} />
+            ))}
           </tbody>
         </table>
         {visiveis.length === 0 && <p className="suave">Nenhuma torre neste recorte.</p>}
@@ -95,14 +106,20 @@ export function Torres() {
   );
 }
 
-function Linha({ t }: { t: Torre }) {
+function Linha({ t, aoEscolherTramo }: { t: Torre; aoEscolherTramo: () => void }) {
   const pernas = [t.perna_a, t.perna_b, t.perna_c, t.perna_d];
   const temPernas = pernas.some((p) => p !== null);
   return (
-    <tr>
+    <tr className={t.ancoragem ? 'ancoragem' : undefined}>
       <td>{t.linha_sigla}</td>
+      <td className="num">
+        <button className="tramo" onClick={aoEscolherTramo} title="Ver só este tramo">{t.tramo}</button>
+      </td>
       <td className="num">{t.numero}</td>
-      <td>{t.tipo} <span className="suave">{t.categoria === 'estaiada' ? 'estaiada' : 'autoportante'}</span></td>
+      <td>
+        {t.tipo} <span className="suave">{t.categoria}</span>
+        {t.ancoragem && <span className="marca" title={t.arranjo_ferragens ?? ''}>ancoragem</span>}
+      </td>
       <td className="num">{formatarMetros(t.altura_util)}</td>
       <td className="num">{formatarMetros(t.extensao)}</td>
       <td className="num">

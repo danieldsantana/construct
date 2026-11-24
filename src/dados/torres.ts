@@ -18,6 +18,9 @@ export type Torre = {
   perna_referencia: string | null;
   canteiro_id: number | null;
   canteiro: string | null;
+  ancoragem: boolean;
+  arranjo_ferragens: string | null;
+  tramo: number | null;
 };
 
 type Resultado = { torres: Torre[]; carregando: boolean; erro: string | null };
@@ -37,7 +40,7 @@ export function useTorres(): Resultado {
     let ativo = true;
     supabase
       .from('torre_detalhe')
-      .select('id, linha_id, linha_sigla, numero, ordem, tipo, categoria, altura_util, extensao, perna_a, perna_b, perna_c, perna_d, perna_referencia, canteiro_id, canteiro')
+      .select('id, linha_id, linha_sigla, numero, ordem, tipo, categoria, altura_util, extensao, perna_a, perna_b, perna_c, perna_d, perna_referencia, canteiro_id, canteiro, ancoragem, arranjo_ferragens, tramo')
       .order('linha_sigla')
       .order('ordem')
       .range(0, 4999)

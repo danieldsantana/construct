@@ -13,6 +13,7 @@ Layout das planilhas: ver o mapa privado das fontes (§2 LC, §5.3 distribuiçã
 from __future__ import annotations
 
 import argparse
+import re
 import sys
 from collections import Counter
 
@@ -38,7 +39,9 @@ CANTEIROS = {  # nome na distribuição (sem " - BA") -> nome na ferramenta
 }
 # Colunas da aba LC (iguais nas duas LCs a partir de K)
 COL = {"numero": 0, "tipo": 17, "altura": 18, "extensao": 20,
-       "perna_a": 21, "perna_b": 22, "perna_c": 23, "perna_d": 24, "perna_ref": 25}
+       "perna_a": 21, "perna_b": 22, "perna_c": 23, "perna_d": 24, "perna_ref": 25,
+       "arranjo": 33}
+ANCORAGEM_RE = re.compile(r"\bAD\d")  # cadeia de ancoragem no arranjo de ferragens (ex.: 6-AD4-21)
 
 
 def arquivo_lc(documento: str):
@@ -59,6 +62,7 @@ def ler_lc(arq):
         if not num or not tipo or tipo == "PORT":
             continue
         ref = str(row[COL["perna_ref"]] or "").strip().upper()
+        arranjo = " ".join(str(row[COL["arranjo"]] or "").split()) or None
         torres.append({
             "numero": num,
             "tipo": tipo,
@@ -69,6 +73,8 @@ def ler_lc(arq):
             "perna_c": numero(row[COL["perna_c"]]),
             "perna_d": numero(row[COL["perna_d"]]),
             "perna_referencia": ref if ref in ("A", "B", "C", "D") else None,
+            "arranjo_ferragens": arranjo,
+            "ancoragem": bool(arranjo and ANCORAGEM_RE.search(arranjo)),
         })
     return torres
 
@@ -122,12 +128,18 @@ def main() -> int:
     with conn, conn.cursor() as cur:
         for canteiro in sorted(set(CANTEIROS.values())):
             cur.execute("insert into public.canteiro (nome) values (%s) on conflict (nome) do nothing", (canteiro,))
-        todos_tipos = sorted({t["tipo"] for *_, torres, _f in dados for t in torres})
-        for tipo in todos_tipos:
+        ancora = {}
+        for *_, torres, _f in dados:
+            for t in torres:
+                ancora.setdefault(t["tipo"], set()).add(t["ancoragem"])
+        for tipo, valores in sorted(ancora.items()):
+            if len(valores) > 1:
+                print(f"  aviso: tipo {tipo} aparece como ancoragem e como suspensão na LC")
+            funcao = "ancoragem" if True in valores else ("transposição" if tipo.endswith("TR") else "suspensão")
             cur.execute(
-                "insert into public.tipo_torre (codigo, categoria) values (%s, %s) "
-                "on conflict (codigo) do update set categoria = excluded.categoria",
-                (tipo, "estaiada" if tipo in ESTAIADAS else "autoportante"))
+                "insert into public.tipo_torre (codigo, categoria, funcao) values (%s, %s, %s) "
+                "on conflict (codigo) do update set categoria = excluded.categoria, funcao = excluded.funcao",
+                (tipo, "estaiada" if tipo in ESTAIADAS else "autoportante", funcao))
         cur.execute("select codigo, id from public.tipo_torre")
         tipo_id = dict(cur.fetchall())
         cur.execute("select nome, id from public.canteiro")
@@ -145,15 +157,18 @@ def main() -> int:
             for ordem, t in enumerate(torres, start=1):
                 cur.execute(
                     """insert into public.torre (linha_id, numero, ordem, tipo_torre_id, altura_util, extensao,
-                         perna_a, perna_b, perna_c, perna_d, perna_referencia, lc_revisao)
-                       values (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)
+                         perna_a, perna_b, perna_c, perna_d, perna_referencia, lc_revisao,
+                         arranjo_ferragens, ancoragem)
+                       values (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)
                        on conflict (linha_id, numero) do update set ordem=excluded.ordem,
                          tipo_torre_id=excluded.tipo_torre_id, altura_util=excluded.altura_util,
                          extensao=excluded.extensao, perna_a=excluded.perna_a, perna_b=excluded.perna_b,
                          perna_c=excluded.perna_c, perna_d=excluded.perna_d,
-                         perna_referencia=excluded.perna_referencia, lc_revisao=excluded.lc_revisao""",
+                         perna_referencia=excluded.perna_referencia, lc_revisao=excluded.lc_revisao,
+                         arranjo_ferragens=excluded.arranjo_ferragens, ancoragem=excluded.ancoragem""",
                     (linha_id, t["numero"], ordem, tipo_id[t["tipo"]], t["altura_util"], t["extensao"],
-                     t["perna_a"], t["perna_b"], t["perna_c"], t["perna_d"], t["perna_referencia"], rev))
+                     t["perna_a"], t["perna_b"], t["perna_c"], t["perna_d"], t["perna_referencia"], rev,
+                     t["arranjo_ferragens"], t["ancoragem"]))
             cur.execute("select count(*) from public.torre where linha_id = %s and ordem > 100000", (linha_id,))
             sobras = cur.fetchone()[0]
             if sobras:
@@ -174,6 +189,13 @@ def main() -> int:
         print("\nGravado. Torres por canteiro:")
         for l, c, n in cur.fetchall():
             print(f"  {l}  {c:<16} {n}")
+        cur.execute("""select l.sigla, count(*), min(tr.qtd_torres), max(tr.qtd_torres),
+                              (select count(*) from public.torre t where t.linha_id = l.id and t.ancoragem)
+                       from public.tramo tr join public.linha l on l.id = tr.linha_id
+                       group by l.id, l.sigla order by 1""")
+        print("Tramos:")
+        for l, n, mn, mx, anc in cur.fetchall():
+            print(f"  {l}  {anc} ancoragens · {n} tramos · de {mn} a {mx} torres por tramo")
     return 0
 
 
