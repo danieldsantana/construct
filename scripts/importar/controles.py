@@ -49,6 +49,14 @@ CONTROLES = [
 ]
 TIPO_RE = re.compile(r"\b(C4[A-Z0-9]+|BCTV)\b")
 TOL = 1e-6
+# Quantidade digitada na coluna de rótulos que já foi rastreada: (arquivo, linha da ENTRADA) -> coluna certa + prova.
+# A prova é a saída correspondente noutro controle (lida da planilha); se não conferir, vira ajuste como antes.
+CORRECOES = {
+    ("5 - Controle de estruturas - Laje dos Negros - Rev.01.xlsx", 42): {
+        "coluna": "F", "motivo": "transferência PINOS_4 de 10/08/2026 (Barra → Laje T3): 58 digitados na coluna E",
+        "prova": ("02 - Estruturas T3/1 - Controle de estruturas - Barra - Rev.01.xlsx", "DA", "PINO BR-38.1 - 381 - C4EL", -58),
+    },
+}
 
 
 def data(v):
@@ -223,6 +231,23 @@ def renomear_repetidos(arq: Path, itens, linhas_vol) -> dict[str, str]:
 def importar(cur, arq, linha, canteiro, tipo_id):
     colunas, itens, vol, peso_total, col_e, letra_rot, renomeados, correcao = ler_controle(DADOS / arq)
     arq = Path(arq).name  # a origem gravada usa só o nome do arquivo
+    for lin, q in list(col_e):
+        cor = CORRECOES.get((arq, lin))
+        if not cor:
+            continue
+        p_arq, p_col, p_desc, p_q = cor["prova"]
+        p_colunas, p_itens = ler_controle(DADOS / p_arq)[:2]
+        jp = next((c["j"] for c in p_colunas if c["letra"] == p_col), None)
+        achado = next((it["qt"].get(jp) for it in p_itens if it["desc"] == p_desc), None)
+        destino = next((c for c in colunas if c["letra"] == cor["coluna"]), None)
+        if achado is None or abs(achado - p_q) > TOL or destino is None:
+            print(f"   correção da linha {lin} NÃO aplicada: prova {p_col} = {achado} (esperado {p_q})")
+            continue
+        it = next(i for i in itens if i["linha"] == lin)
+        it["qt"][destino["j"]] = it["qt"].get(destino["j"], 0.0) + q
+        col_e.remove((lin, q))
+        print(f"   correção: linha {lin} ({it['desc']}) {q:g} da coluna {letra_rot} → coluna {cor['coluna']} — {cor['motivo']}; "
+              f"conferido em {Path(p_arq).name} col. {p_col} = {achado:g}")
     if col_e:
         print(f"   atenção: {len(col_e)} quantidade(s) na coluna {letra_rot} (rótulos) da ENTRADA, sem NF nem data — importadas como ajuste: "
               + ", ".join(f"linha {i} = {q:g}" for i, q in col_e))
