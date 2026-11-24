@@ -346,6 +346,11 @@ def importar(cur, arq, linha, canteiro, tipo_id):
         nf_id = dict(res)
         cur.execute("update public.nota_fiscal set of_fonte = 'controle' where of_texto is not null and of_fonte is null and id = any(%s)",
                     (list(nf_id.values()),))
+        cur.execute("""select n.numero from public.movimento m join public.nota_fiscal n on n.id = m.nota_fiscal_id
+                       where m.origem like 'lancamento:%%' and n.id = any(%s)""", (list(nf_id.values()),))
+        duplas = [x[0] for x in cur.fetchall()]
+        if duplas:
+            print(f"   ATENÇÃO: NFs já lançadas pelo app e agora também no controle (recebido contado 2×, revisar): {duplas}")
     linhas_mov = []
     for c in colunas:
         tipo = "recebimento" if c["nf"] else "transferencia"
