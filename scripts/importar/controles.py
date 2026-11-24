@@ -123,13 +123,13 @@ def ler_controle(arq: Path):
     colunas = [c for c in colunas if c["data"] is not None]
     # VOLUMES RECEBIDOS: parte e peso unitário por descrição; e o total da coluna PESO recebido
     linhas_vol = []
-    for r in wb["VOLUMES RECEBIDOS"].iter_rows(min_row=4, values_only=True):
+    for nlin, r in enumerate(wb["VOLUMES RECEBIDOS"].iter_rows(min_row=4, values_only=True), start=4):
         r = list(r) + [None] * 12
         if not r[1 + d] or numero(r[3 + d]) is None or (isinstance(r[d], str) and r[d].upper().startswith("ESTRUTURA")):
             continue
         # coluna I (J no deslocado), CONJUNTO COMPLETO: valor calculado pelo controle, só na 1ª linha de cada parte
         linhas_vol.append({"desc": " ".join(str(r[1 + d]).split()), "parte": r[2 + d], "pu": numero(r[4 + d]),
-                           "cc": numero(r[8 + d]), "peso_rec": numero(r[7 + d]) or 0.0})
+                           "cc": numero(r[8 + d]), "peso_rec": numero(r[7 + d]) or 0.0, "lin": nlin})
     wb.close()
     renomeados = renomear_repetidos(arq, itens, linhas_vol)
     vol = {v["desc"]: v for v in linhas_vol}
@@ -144,12 +144,30 @@ def ler_controle(arq: Path):
                 certo = rec.get(v["desc"], 0.0) * v["pu"]
                 correcao += certo - v["peso_rec"]
                 peso_total += certo - v["peso_rec"]
-        # conjunto completo dessas partes (ex. 'C4EP - TRONCO SUPERIOR') está errado pelo mesmo motivo: não importa
+        # conjunto completo dessas partes (ex. 'C4EP - TRONCO SUPERIOR') está errado pelo mesmo motivo. Corrigido com a
+        # MESMA fórmula do controle (=SMALL(<linhas do grupo>,1)) aplicada ao recebido certo de cada linha da ENTRADA;
+        # se a fórmula da planilha não for essa, o valor não é importado.
         base = lambda s: s.rsplit(" (", 1)[0]  # noqa: E731
         afetadas = {base(nome) for nome in renomeados}
-        for v in linhas_vol:
-            if base(v["desc"]) in afetadas:
+        wf = openpyxl.load_workbook(arq, read_only=True)  # fórmulas
+        col_cc = get_column_letter(9 + d)
+        formulas = {}
+        alvo = {v["lin"] for v in linhas_vol if base(v["desc"]) in afetadas and v["cc"] is not None}
+        for nlin, (f,) in enumerate(wf["VOLUMES RECEBIDOS"].iter_rows(min_row=4, min_col=9 + d, max_col=9 + d, values_only=True), start=4):
+            if nlin in alvo:
+                formulas[nlin] = str(f or "")
+        wf.close()
+        for b in afetadas:
+            grupo = [v for v in linhas_vol if base(v["desc"]) == b]
+            planilha = grupo[0]["cc"]
+            for v in grupo:
                 v["cc"] = None
+            cab = grupo[0]
+            m = re.match(rf"^=SMALL\({get_column_letter(7 + d)}(\d+):{get_column_letter(7 + d)}(\d+),1\)$", formulas.get(cab["lin"], ""))
+            if m and (int(m.group(1)), int(m.group(2))) == (grupo[0]["lin"], grupo[-1]["lin"]):
+                cab["cc"] = min(rec.get(v["desc"], 0.0) for v in grupo)
+                cab["cc_corrigido"] = True
+                cab["cc_planilha"] = planilha
     return colunas, itens, vol, peso_total, col_e_usada, get_column_letter(cr + 1), renomeados, correcao
 
 
@@ -209,6 +227,7 @@ def importar(cur, arq, linha, canteiro, tipo_id):
         print(f"   atenção: {len(col_e)} quantidade(s) na coluna {letra_rot} (rótulos) da ENTRADA, sem NF nem data — importadas como ajuste: "
               + ", ".join(f"linha {i} = {q:g}" for i, q in col_e))
     difs_pre = []
+    cc_corrigidos = [(v, v.get("cc_planilha") or 0) for v in vol.values() if v.get("cc_corrigido")]
     if renomeados:
         # renomeado pela posição: a sequência de pesos unitários (1/N … N/N) tem de ser a de um volume do mesmo tipo
         # na matriz de embalagem (fonte de verdade). Tipo fora da matriz: só aceito se nada foi recebido nessas linhas.
@@ -233,7 +252,9 @@ def importar(cur, arq, linha, canteiro, tipo_id):
         print(f"   atenção: {len(renomeados)} volumes com nome repetido na planilha, separados pela posição e conferidos pela "
               f"sequência de pesos da matriz: {'; '.join(avisos)}{' · DIVERGE' if difs_pre else ''}. "
               f"Peso recebido pela ENTRADA − pela VOLUMES: {correcao:+.1f} kg "
-              f"(lá o VLOOKUP pega o recebido da 1ª linha); conjunto completo dessas partes não importado.")
+              f"(lá o VLOOKUP pega o recebido da 1ª linha); conjunto completo dessas partes recalculado com a fórmula do controle "
+              f"(SMALL) sobre o recebido de cada linha: " + ", ".join(
+                  f"{v['desc'].rsplit(' (', 1)[0]} = {v['cc']:g} (planilha mostra {pc:g})" for v, pc in cc_corrigidos))
     cur.execute("select id from public.linha where sigla = %s", (linha,))
     linha_id = cur.fetchone()[0]
     cur.execute("select id from public.canteiro where nome = %s", (canteiro,))

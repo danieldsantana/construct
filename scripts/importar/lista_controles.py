@@ -4,7 +4,8 @@ Uso:  python scripts/importar/lista_controles.py [--simular]
 
 Conferência por controle (se falhar, aquele controle não é gravado):
   1. toda torre da LISTA existe na LC daquela linha;
-  2. (aviso, não bloqueia) torres da LISTA × faixa oficial do canteiro;
+  2. (aviso, não bloqueia) torres da LISTA × faixa oficial do canteiro — vale a divisão do controle (decisão 24/11):
+     a torre fica no canteiro da LISTA em que aparece (torre_controle.canteiro_id);
   3. a quantidade de "Entregue" é igual ao TOTAL da coluna "TORRES COM ESTRUTURA E FIXADORES" da TABELAS.
 """
 from __future__ import annotations
@@ -65,7 +66,9 @@ def main() -> int:
         with conn.cursor() as cur:
             cur.execute("select t.numero, t.id from public.torre t join public.linha l on l.id = t.linha_id where l.sigla = %s", (linha,))
             ids = dict(cur.fetchall())
-            cur.execute("select numero from public.torre_detalhe where linha_sigla = %s and canteiro = %s", (linha, canteiro))
+            cur.execute("select id from public.canteiro where nome = %s", (canteiro,))
+            cid = cur.fetchone()[0]
+            cur.execute("select numero from public.torre_detalhe where linha_sigla = %s and canteiro_oficial = %s", (linha, canteiro))
             faixa = {x[0] for x in cur.fetchall()}
             fora_lc = [t["num"] for t in torres if t["num"] not in ids]
             lista = {t["num"] for t in torres}
@@ -84,10 +87,10 @@ def main() -> int:
                 conn.rollback()
                 ok = ok and not difs
                 continue
-            execute_values(cur, """insert into public.torre_controle (torre_id, status, sequencia, composicao, fonte) values %s
+            execute_values(cur, """insert into public.torre_controle (torre_id, status, sequencia, composicao, fonte, canteiro_id) values %s
                                    on conflict (torre_id) do update set status = excluded.status, sequencia = excluded.sequencia,
-                                     composicao = excluded.composicao, fonte = excluded.fonte""",
-                           [(ids[t["num"]], t["status"], t["seq"], json.dumps(t["comp"]), f"controle:{Path(arq).name} · {aba}") for t in torres])
+                                     composicao = excluded.composicao, fonte = excluded.fonte, canteiro_id = excluded.canteiro_id""",
+                           [(ids[t["num"]], t["status"], t["seq"], json.dumps(t["comp"]), f"controle:{Path(arq).name} · {aba}", cid) for t in torres])
         conn.commit()
     if a.simular:
         print("Simulação: nada foi gravado.")
