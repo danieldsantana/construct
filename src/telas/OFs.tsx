@@ -11,7 +11,8 @@ const n = (v: number | string | null | undefined) => Number(v ?? 0);
 const hoje = new Date().toISOString().slice(0, 10);
 
 // OFs = resumo de OFs do cliente (só T3/T4) × NFs recebidas que citam a OF.
-// Entra no escopo a OF cujo canteiro de entrega está no escopo, ou que teve NF recebida num canteiro do escopo.
+// Entra no escopo a OF cujo canteiro de entrega está no escopo, ou que tem NF entregue (ou a entregar) num canteiro do escopo
+// — o local de entrega da NF prevalece sobre o canteiro previsto na OF.
 export function OFs() {
   const ofs = useOFs();
   const itens = useOFItens();
@@ -32,7 +33,7 @@ export function OFs() {
   }, [nfs.dados]);
   const doEscopo = useMemo(() => ofs.dados.filter((o) =>
     (o.canteiro && inclui(o.linha, o.canteiro)) ||
-    (nfsPorOF.get(o.id) ?? []).some((x) => x.situacao !== 'nao_recebida' && x.canteiro_recebimento && inclui(x.linha_nf ?? o.linha, x.canteiro_recebimento))),
+    (nfsPorOF.get(o.id) ?? []).some((x) => !!x.local_entrega && inclui(x.linha_local ?? o.linha, x.local_entrega))),
   [ofs.dados, nfsPorOF, inclui]);
 
   if (ofs.carregando || nfs.carregando) return <><Titulo texto="OFs" /><p className="muted">Carregando…</p></>;

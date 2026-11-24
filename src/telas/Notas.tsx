@@ -35,10 +35,11 @@ export function Notas() {
   const [abertoMov, setAbertoMov] = useState<Recebimento | null>(null);
   const fechar = useCallback(() => { setAbertaNF(null); setAbertoMov(null); }, []);
 
-  // NF sem linha definida (reposição "ND"): entra se o canteiro estiver no escopo em qualquer linha
+  // Local de entrega prevalece: canteiro onde foi (ou será) entregue + linha do controle desse canteiro.
+  // Sem linha conhecida (reposição "ND" sem controle no destino): entra se o canteiro estiver no escopo em qualquer linha.
   const nfNoEscopo = useCallback((n: NotaFiscal) => {
-    const c = n.canteiro_recebimento ?? n.destino ?? '';
-    if (n.linha) return inclui(n.linha, c);
+    const c = n.local_entrega ?? '';
+    if (n.linha_local) return inclui(n.linha_local, c);
     return !escopo.canteiro ? inclui('T3', c) || inclui('T4', c) : c === escopo.canteiro;
   }, [inclui, escopo.canteiro]);
 

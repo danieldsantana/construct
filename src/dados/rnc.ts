@@ -7,6 +7,7 @@ export type RncNF = {
   nf_id: number; numero: string; emissao: string | null; linha: string | null;
   destino: string | null; canteiro_recebimento: string | null;
   situacao_exibida: SituacaoNF; recebida_em: string | null; of_texto: string | null; arquivo: string | null;
+  local_entrega: string | null; linha_local: string | null;
 };
 export const useRncNF = () => useTabela<RncNF>('rnc_nf', '*', ['nf_id', 'rnc']);
 

@@ -24,8 +24,8 @@ export function RNCs() {
 
   // NF de reposição costuma vir sem linha ("ND"): entra pelo canteiro, em qualquer linha
   const noEscopo = (x: RncNF) => {
-    const c = x.canteiro_recebimento ?? x.destino ?? '';
-    if (x.linha) return inclui(x.linha, c);
+    const c = x.local_entrega ?? '';  // local de entrega prevalece
+    if (x.linha_local) return inclui(x.linha_local, c);
     return !escopo.canteiro ? inclui('T3', c) || inclui('T4', c) : c === escopo.canteiro;
   };
 

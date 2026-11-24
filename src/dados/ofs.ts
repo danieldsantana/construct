@@ -15,6 +15,7 @@ export type OFNF = {
   of_id: number; nf_id: number; numero: string; emissao: string | null; peso: number | null;
   situacao: 'nao_recebida' | 'em_conferencia' | 'confirmada'; canteiro_recebimento: string | null; linha_nf: string | null; recebida_em: string | null;
   situacao_exibida: SituacaoNF; destino: string | null; sac: string | null; rnc: string | null;
+  local_entrega: string | null; linha_local: string | null;
 };
 
 export const useOFs = () => useTabela<OF>('of_resumo', '*', ['linha', 'numero']);

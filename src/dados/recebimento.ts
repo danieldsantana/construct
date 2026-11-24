@@ -57,9 +57,10 @@ export type NotaFiscal = {
   romaneio: string | null; valor: number | null; peso: number | null; arquivo: string | null; sac: string | null; rnc: string | null;
   linha: string | null; destino: string | null; canteiro_recebimento: string | null;
   recebida_em: string | null; recebimentos: number; itens: number; situacao_exibida: SituacaoNF;
+  local_entrega: string | null; linha_local: string | null;
 };
 export const useNotasFiscais = () =>
-  useTabela<NotaFiscal>('nf_lista', 'id, numero, emissao, fornecedor, of_texto, romaneio, valor, peso, arquivo, sac, rnc, linha, destino, canteiro_recebimento, recebida_em, recebimentos, itens, situacao_exibida', ['id']);
+  useTabela<NotaFiscal>('nf_lista', 'id, numero, emissao, fornecedor, of_texto, romaneio, valor, peso, arquivo, sac, rnc, linha, destino, canteiro_recebimento, recebida_em, recebimentos, itens, situacao_exibida, local_entrega, linha_local', ['id']);
 
 // Conjunto completo como o controle calcula (coluna I da VOLUMES RECEBIDOS), na 1ª linha de cada parte.
 export type ConjuntoControle = { linha_id: number; canteiro_id: number; material_id: number; quantidade: number };
