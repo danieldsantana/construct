@@ -21,5 +21,6 @@ export function colunaExcel(letra: string): number {
 
 export function colunaDaOrigem(origem: string): number {
   const m = /#([A-Z]+)$/.exec(origem);
-  return m ? colunaExcel(m[1]) : 0;
+  // sem coluna de Excel (lançamento feito pelo app): depois de todas as colunas do controle
+  return m ? colunaExcel(m[1]) : 1e6;
 }
