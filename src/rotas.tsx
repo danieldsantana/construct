@@ -4,6 +4,7 @@ import { Inicio } from './telas/Inicio';
 import { Torres } from './telas/Torres';
 import { Notas } from './telas/Notas';
 import { Estoque } from './telas/Estoque';
+import { OFs } from './telas/OFs';
 
 // HashRouter: o GitHub Pages só serve arquivos estáticos, então as rotas ficam após o "#".
 export const roteador = createHashRouter([
@@ -15,6 +16,7 @@ export const roteador = createHashRouter([
       { path: 'torres', element: <Torres /> },
       { path: 'notas', element: <Notas /> },
       { path: 'estoque', element: <Estoque /> },
+      { path: 'ofs', element: <OFs /> },
     ],
   },
 ]);
