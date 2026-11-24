@@ -290,6 +290,9 @@ def importar(cur, arq, linha, canteiro, tipo_id):
                  romaneio = coalesce(public.nota_fiscal.romaneio, excluded.romaneio),
                  valor = coalesce(public.nota_fiscal.valor, excluded.valor),
                  peso = coalesce(public.nota_fiscal.peso, excluded.peso),
+                 -- NF que já veio do índice dos PDFs: a linha do índice vale; sem linha (ND), fica a do controle
+                 linha_id = coalesce(public.nota_fiscal.linha_id, excluded.linha_id),
+                 canteiro_id = coalesce(public.nota_fiscal.canteiro_id, excluded.canteiro_id),
                  situacao = 'confirmada',
                  recebida_em = least(public.nota_fiscal.recebida_em, excluded.recebida_em)
                returning numero, id""", list(nfs.values()), template="(%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s::public.situacao_nf,%s,%s)",

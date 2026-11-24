@@ -10,6 +10,7 @@ const MENUS: [string, string][] = [
   ['/notas', 'Notas fiscais'],
   ['/estoque', 'Estoque'],
   ['/ofs', 'OFs'],
+  ['/rncs', 'RNCs'],
 ];
 
 export function Moldura() {
