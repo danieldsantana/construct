@@ -7,6 +7,7 @@ from __future__ import annotations
 
 import re
 import sys
+import unicodedata
 import warnings
 from decimal import Decimal, InvalidOperation
 from pathlib import Path
@@ -29,6 +30,12 @@ def conectar():
     if not url or "SUA_SENHA" in url:
         sys.exit("SUPABASE_DB_URL não está preenchida no .env")
     return psycopg2.connect(url, connect_timeout=20)
+
+
+def sem_acento(s) -> str:
+    """'Data de Emissão:' -> 'DATA DE EMISSAO:' (maiúsculas, sem acento, espaços normalizados)."""
+    s = "".join(c for c in unicodedata.normalize("NFD", str(s)) if unicodedata.category(c) != "Mn")
+    return " ".join(s.upper().split())
 
 
 def numero(valor) -> Decimal | None:

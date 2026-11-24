@@ -22,7 +22,7 @@ export function Notas() {
   const ofs = useMemo(() => [...new Set(doEscopo.map((r) => r.of_texto).filter(Boolean) as string[])].sort(), [doEscopo]);
   const visiveis = useMemo(() => doEscopo
     .filter((r) => (filtro === 'todos' || (filtro === 'nf' ? r.tipo === 'recebimento' : r.tipo === 'transferencia')) && (!of || r.of_texto === of))
-    .sort((a, b) => b.data.localeCompare(a.data) || colunaDaOrigem(b.origem) - colunaDaOrigem(a.origem)), [doEscopo, filtro, of]);
+    .sort((a, b) => (b.data ?? '').localeCompare(a.data ?? '') || colunaDaOrigem(b.origem) - colunaDaOrigem(a.origem)), [doEscopo, filtro, of]);
   const variosCanteiros = new Set(doEscopo.map((r) => r.linha + r.canteiro)).size > 1;
 
   if (rec.carregando) return <><Titulo texto="Notas fiscais" /><p className="muted">Carregando…</p></>;
@@ -59,7 +59,9 @@ export function Notas() {
               <tbody>
                 {visiveis.map((r) => (
                   <tr key={r.id} className="clk" onClick={() => setAberto(r)}>
-                    <td>{r.tipo === 'transferencia' ? <span className="st info">Transferência</span> : <span className="st ok">Recebida</span>}</td>
+                    <td>{r.tipo === 'transferencia' ? <span className="st info">Transferência</span>
+                      : r.tipo === 'ajuste' ? <span className="st sf" title="Quantidade lançada fora de uma coluna de recebimento">Ajuste</span>
+                      : <span className="st ok">Recebida</span>}</td>
                     <td className="num"><b>{r.numero ?? r.documento ?? '—'}</b></td>
                     <td className="num">{data(r.emissao)}</td>
                     <td className="num">{data(r.data)}</td>
@@ -120,7 +122,7 @@ function PlanilhaEntrada({ linha, canteiro, recebimentos, aoAbrir }: { linha: st
             <th className="stk">Descrição</th><th className="r">Previsto</th><th className="r">Recebido</th>
             {mostrar.map((c) => (
               <th key={c.id} className="nfcol" title={`${c.of_texto ?? ''} · recebida ${data(c.data)}`} onClick={() => aoAbrir(c)}>
-                <span>{c.numero ?? 'TRANSF.'}</span><small>{data(c.data, true)}</small>
+                <span>{c.numero ?? (c.tipo === 'ajuste' ? 'COL. E' : 'TRANSF.')}</span><small>{data(c.data, true)}</small>
               </th>
             ))}
           </tr></thead>
@@ -166,7 +168,7 @@ function FichaRecebimento({ r, aoFechar }: { r: Recebimento | null; aoFechar: ()
   let secao = '';
   return (
     <Gaveta aberta={!!r} aoFechar={aoFechar}
-            sub={r ? `${r.tipo === 'transferencia' ? 'Transferência' : 'Nota fiscal'} · ${r.linha} · ${r.canteiro}` : ''}
+            sub={r ? `${r.tipo === 'transferencia' ? 'Transferência' : r.tipo === 'ajuste' ? 'Ajuste' : 'Nota fiscal'} · ${r.linha} · ${r.canteiro}` : ''}
             titulo={r ? (r.numero ? `NF ${r.numero}` : r.documento ?? 'Transferência') : ''}
             resumo={r ? [['Recebida', data(r.data)], ['OF', r.of_texto ?? '—'], ['Peso', r.peso ? `${num(r.peso, 1)} kg` : '—'], ['Itens', r.itens]] : []}>
       {r && (

@@ -2,8 +2,8 @@ import { useTabela } from '../lib/dados';
 
 export type Recebimento = {
   id: number;
-  tipo: 'recebimento' | 'transferencia';
-  data: string;
+  tipo: 'recebimento' | 'transferencia' | 'ajuste';
+  data: string | null;
   documento: string | null;
   origem: string;
   linha_id: number;
@@ -49,6 +49,11 @@ export const useRecebimentos = () =>
 
 export const useSaldos = () =>
   useTabela<Saldo>('saldo_material_detalhe', 'linha_id, linha, canteiro_id, canteiro, material_id, secao, descricao, parte, tipo, unidade, peso_unit, ordem, previsto, recebido, saido, saldo', ['linha_id', 'canteiro_id', 'material_id']);
+
+// Conjunto completo como o controle calcula (coluna I da VOLUMES RECEBIDOS), na 1ª linha de cada parte.
+export type ConjuntoControle = { linha_id: number; canteiro_id: number; material_id: number; quantidade: number };
+export const useConjuntosControle = () =>
+  useTabela<ConjuntoControle>('conjunto_controle', 'linha_id, canteiro_id, material_id, quantidade', ['linha_id', 'canteiro_id', 'material_id']);
 
 export const useLancamentos = () =>
   useTabela<Lancamento>('movimento_item_detalhe', '*', ['movimento_id', 'material_id']);

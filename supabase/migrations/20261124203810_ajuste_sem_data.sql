@@ -1,0 +1,2 @@
+-- Vazia por engano (o comando que a criou travou antes de escrever o conteúdo).
+-- A alteração foi feita em 20261124205000_ajuste_sem_data_v2.sql.

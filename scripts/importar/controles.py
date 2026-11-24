@@ -2,8 +2,8 @@
 da F) e CONFERE o resultado contra a própria planilha antes de gravar.
 
 Uso (na raiz do projeto):
-    python scripts/importar/controle_t4.py --simular          # lê e confere a leitura, sem gravar
-    python scripts/importar/controle_t4.py                    # grava os dois controles do T4
+    python scripts/importar/controles.py --simular          # lê e confere a leitura, sem gravar
+    python scripts/importar/controles.py                    # grava os dois controles do T4
 
 O que é gravado, por controle (linha + canteiro):
     material     um por linha de item da ENTRADA (seção + descrição); parte e peso vêm da VOLUMES RECEBIDOS
@@ -30,14 +30,15 @@ from openpyxl.utils import get_column_letter
 from psycopg2.extras import execute_values
 
 sys.path.insert(0, Path(__file__).parent.as_posix())
-from comum import DADOS, conectar  # noqa: E402
+from comum import DADOS, conectar, sem_acento  # noqa: E402
 
 CONTROLES = [
-    # arquivo (em "Dados criação/01 - Controle de estruturas T4"), linha, canteiro
-    ("1 - Controle de estruturas - Juazeiro.xlsx", "T4", "Juazeiro"),
-    ("2 - Controle de estruturas - Laje dos Negros.xlsx", "T4", "Laje dos Negros"),
+    # arquivo (relativo a "Dados criação/"), linha, canteiro. Layout com rótulos da ENTRADA na coluna E.
+    ("01 - Controle de estruturas T4/1 - Controle de estruturas - Juazeiro.xlsx", "T4", "Juazeiro"),
+    ("01 - Controle de estruturas T4/2 - Controle de estruturas - Laje dos Negros.xlsx", "T4", "Laje dos Negros"),
+    ("02 - Estruturas T3/4 - Controle de estruturas - Umburanas - Rev.01.xlsx", "T3", "Umburanas"),
+    ("02 - Estruturas T3/5 - Controle de estruturas - Laje dos Negros - Rev.01.xlsx", "T3", "Laje dos Negros"),
 ]
-PASTA = DADOS / "01 - Controle de estruturas T4"
 TIPO_RE = re.compile(r"\b(C4[A-Z0-9]+|BCTV)\b")
 TOL = 1e-6
 
@@ -60,28 +61,38 @@ def ler_controle(arq: Path):
     largura = max(len(r) for r in rows)
     for r in rows:
         r.extend([None] * (largura - len(r)))
-    cab = rows[:8]
-    # colunas somadas pela fórmula RECEBIDO: =SUMIF($E$1:$AFB$1,"<>"&"", E:AFB) -> toda coluna a partir de E com linha 1 preenchida
-    cols = [j for j in range(4, largura) if cab[0][j] not in (None, "")]
+    # cabeçalho localizado pelos rótulos da coluna E (o T4 tem a linha "Ordem de Fabricação", o T3 não)
+    h = next(i for i, r in enumerate(rows) if str(r[0] or "").strip().upper().startswith("DESCRI"))
+    rot = {}
+    for i in range(h):
+        lab = sem_acento(rows[i][4] or "")
+        for chave, padrao in (("data", "DATA DE RECEB"), ("forn", "FORNECEDOR"), ("nf", "NOTA FISCAL"), ("emissao", "DATA DE EMISS"),
+                              ("romaneio", "ROMANEIO"), ("valor", "VALOR"), ("peso", "PESO"), ("of", "ORDEM DE FAB")):
+            if lab.startswith(padrao):
+                rot[chave] = i
+    if "data" not in rot or "nf" not in rot:
+        raise SystemExit(f"{arq.name}: não achei as linhas 'Data de Recebimento' e 'Nota Fiscal' na coluna E da ENTRADA")
+    cel = lambda chave, j: rows[rot[chave]][j] if chave in rot else None  # noqa: E731
+    # colunas somadas pela fórmula RECEBIDO: =SUMIF($E$1:$xx$1,"<>"&"", E:xx) -> toda coluna a partir de E com linha 1 preenchida
+    cols = [j for j in range(4, largura) if rows[0][j] not in (None, "")]
     colunas = []
     for j in cols:
         if j == 4:  # coluna E: rótulo "Data de Recebimento:" (entra na soma, mas não é um recebimento)
             continue
-        bruto = str(cab[2][j]).strip() if cab[2][j] is not None else ""
-        if isinstance(cab[2][j], (int, float)):
-            bruto = str(int(cab[2][j]))
+        bruto = cel("nf", j)
+        bruto = str(int(bruto)) if isinstance(bruto, (int, float)) else (str(bruto).strip() if bruto is not None else "")
         m = re.match(r"^(\d+)", bruto)
-        of = str(cab[7][j]).strip() if cab[7][j] else None
+        of = str(cel("of", j)).strip() if cel("of", j) else None
         mo = re.search(r"(\d+)", of or "")
         colunas.append({
-            "j": j, "letra": get_column_letter(j + 1), "data": data(cab[0][j]), "fornecedor": cab[1][j],
-            "nf": m.group(1) if m else None, "rotulo": bruto, "emissao": data(cab[3][j]),
-            "romaneio": None if cab[4][j] is None else str(cab[4][j]).strip(), "valor": numero(cab[5][j]),
-            "peso": numero(cab[6][j]), "of": of, "of_num": int(mo.group(1)) if mo else None,
+            "j": j, "letra": get_column_letter(j + 1), "data": data(rows[0][j]), "fornecedor": cel("forn", j),
+            "nf": m.group(1) if m else None, "rotulo": bruto, "emissao": data(cel("emissao", j)),
+            "romaneio": None if cel("romaneio", j) is None else str(cel("romaneio", j)).strip(), "valor": numero(cel("valor", j)),
+            "peso": numero(cel("peso", j)), "of": of, "of_num": int(mo.group(1)) if mo else None,
         })
     itens, secao = [], None
     col_e_usada = []
-    for i, r in enumerate(rows[9:], start=10):
+    for i, r in enumerate(rows[h + 1:], start=h + 2):
         desc = r[0]
         if desc in (None, ""):
             continue
@@ -106,16 +117,19 @@ def ler_controle(arq: Path):
     for r in wb["VOLUMES RECEBIDOS"].iter_rows(min_row=4, values_only=True):
         if not r[1] or numero(r[3]) is None or (isinstance(r[0], str) and r[0].upper().startswith("ESTRUTURA")):
             continue
-        vol[" ".join(str(r[1]).split())] = {"parte": r[2], "pu": numero(r[4])}
+        # coluna I (CONJUNTO COMPLETO): valor calculado pelo controle, só na 1ª linha de cada parte
+        vol[" ".join(str(r[1]).split())] = {"parte": r[2], "pu": numero(r[4]), "cc": numero(r[8]) if len(r) > 8 else None}
         peso_total += numero(r[7]) or 0.0
     wb.close()
     return colunas, itens, vol, peso_total, col_e_usada
 
 
 def importar(cur, arq, linha, canteiro, tipo_id):
-    colunas, itens, vol, peso_total, col_e = ler_controle(PASTA / arq)
+    colunas, itens, vol, peso_total, col_e = ler_controle(DADOS / arq)
+    arq = Path(arq).name  # a origem gravada usa só o nome do arquivo
     if col_e:
-        raise SystemExit(f"{arq}: a coluna E tem quantidades em itens ({col_e[:3]}…) — fora do esperado, revisar antes de importar")
+        print(f"   atenção: {len(col_e)} quantidade(s) na coluna E (rótulos) da ENTRADA, sem NF nem data — importadas como ajuste: "
+              + ", ".join(f"linha {i} = {q:g}" for i, q in col_e))
     cur.execute("select id from public.linha where sigla = %s", (linha,))
     linha_id = cur.fetchone()[0]
     cur.execute("select id from public.canteiro where nome = %s", (canteiro,))
@@ -145,6 +159,11 @@ def importar(cur, arq, linha, canteiro, tipo_id):
     execute_values(cur, "insert into public.previsto (linha_id, canteiro_id, material_id, quantidade, fonte) values %s",
                    [(linha_id, canteiro_id, mat_id[(it["secao"], it["desc"])], it["prev"], f"{origem_base} · ENTRADA col. C linha {it['linha']}")
                     for it in itens if it["prev"]], page_size=1000)
+
+    cur.execute("delete from public.conjunto_controle where linha_id = %s and canteiro_id = %s", (linha_id, canteiro_id))
+    execute_values(cur, "insert into public.conjunto_controle (linha_id, canteiro_id, material_id, quantidade, fonte) values %s",
+                   [(linha_id, canteiro_id, mat_id[(it["secao"], it["desc"])], vol[it["desc"]]["cc"], f"{origem_base} · VOLUMES RECEBIDOS col. I")
+                    for it in itens if it["desc"] in vol and vol[it["desc"]]["cc"] is not None], page_size=1000)
 
     cur.execute("delete from public.movimento where origem like %s", (origem_base + "#%",))
     nfs = {}
@@ -182,6 +201,15 @@ def importar(cur, arq, linha, canteiro, tipo_id):
     itens_mov = [(mov_id[f"{origem_base}#{c['letra']}"], mat_id[(it["secao"], it["desc"])], it["qt"][c["j"]])
                  for c in colunas for it in itens if it["qt"].get(c["j"])]
     execute_values(cur, "insert into public.movimento_item (movimento_id, material_id, quantidade) values %s", itens_mov, page_size=2000)
+    if col_e:  # a fórmula RECEBIDO soma a coluna E: o controle conta essas quantidades; aqui ficam visíveis como ajuste
+        cur.execute("""insert into public.movimento (tipo, data, linha_id, canteiro_id, documento, origem, observacao)
+                       values ('ajuste', null, %s, %s, %s, %s, %s) returning id""",
+                    (linha_id, canteiro_id, "Quantidade na coluna E da ENTRADA (sem NF nem data)", f"{origem_base}#E",
+                     "Conferir na planilha a qual recebimento pertence."))
+        aj = cur.fetchone()[0]
+        por_linha = {it["linha"]: it for it in itens}
+        execute_values(cur, "insert into public.movimento_item (movimento_id, material_id, quantidade) values %s",
+                       [(aj, mat_id[(por_linha[i]["secao"], por_linha[i]["desc"])], q) for i, q in col_e])
 
     # ---------- conferência contra a planilha ----------
     cur.execute("""select secao, descricao, previsto, recebido, peso_unit from public.saldo_material
@@ -195,8 +223,9 @@ def importar(cur, arq, linha, canteiro, tipo_id):
             difs.append(f"linha {it['linha']} {it['desc']}: previsto {bp} × {it['prev']} · recebido {br} × {it['rec']}")
     cur.execute("select count(*) from public.movimento where origem like %s", (origem_base + "#%",))
     n_mov = cur.fetchone()[0]
-    if n_mov != len(colunas):
-        difs.append(f"movimentos {n_mov} × colunas {len(colunas)}")
+    esperado = len(colunas) + (1 if col_e else 0)  # + o ajuste da coluna E, quando houver
+    if n_mov != esperado:
+        difs.append(f"movimentos {n_mov} × esperado {esperado} (colunas {len(colunas)})")
     peso_banco = sum(float(b[3]) * float(b[4]) for b in banco.values() if b[4] is not None and (b[0], b[1]) and
                      any(it["desc"] == b[1] for it in itens if it["desc"] in vol))
     if abs(peso_banco - peso_total) > 0.5:
@@ -212,7 +241,7 @@ def main() -> int:
     a = ap.parse_args()
     if a.simular:
         for arq, linha, canteiro in CONTROLES:
-            colunas, itens, vol, peso, col_e = ler_controle(PASTA / arq)
+            colunas, itens, vol, peso, col_e = ler_controle(DADOS / arq)
             soma_ok = sum(1 for it in itens if abs(sum(it["qt"].values()) - it["rec"]) <= TOL)
             print(f"{linha} · {canteiro}: {len(colunas)} colunas ({sum(1 for c in colunas if c['nf'])} NFs), {len(itens)} itens, "
                   f"{len(vol)} volumes com peso · soma das colunas = RECEBIDO em {soma_ok}/{len(itens)} itens"

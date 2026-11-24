@@ -2,7 +2,7 @@ import { useMemo, useState } from 'react';
 import { Abas, Porcentagem, Titulo } from '../componentes/Titulo';
 import { useEscopo } from '../lib/escopo';
 import { num } from '../lib/formato';
-import { useSaldos, type Saldo } from '../dados/recebimento';
+import { useConjuntosControle, useSaldos, type Saldo } from '../dados/recebimento';
 
 type Aba = 'volumes' | 'fixadores';
 const n = (v: number | string | null) => Number(v ?? 0);
@@ -36,6 +36,8 @@ export function Estoque() {
 }
 
 function Volumes({ volumes, canteiros, tipoSel, setTipoSel }: { volumes: Saldo[]; canteiros: { linha: string; canteiro: string }[]; tipoSel: string; setTipoSel: (t: string) => void }) {
+  const conj = useConjuntosControle();
+  const ccControle = new Map(conj.dados.map((c) => [`${c.linha_id}|${c.canteiro_id}|${c.material_id}`, Number(c.quantidade)]));
   const tipos = [...new Set(volumes.map((v) => v.tipo ?? '—'))];
   const tipo = tipos.includes(tipoSel) ? tipoSel : tipos[0];
   const pesoPct = (t: string) => {
@@ -77,8 +79,9 @@ function Volumes({ volumes, canteiros, tipoSel, setTipoSel }: { volumes: Saldo[]
                 </tr></thead>
                 <tbody>
                   {[...grupos].flatMap(([parte, g]) => {
-                    // regra do controle (CONJUNTO COMPLETO): menor quantidade recebida entre os volumes da parte
-                    const cc = Math.min(...g.map((v) => n(v.recebido)));
+                    // CONJUNTO COMPLETO: valor do próprio controle (a regra varia por parte); sem ele, menor recebido da parte
+                    const doControle = g.map((v) => ccControle.get(`${v.linha_id}|${v.canteiro_id}|${v.material_id}`)).find((x) => x !== undefined);
+                    const cc = doControle ?? Math.min(...g.map((v) => n(v.recebido)));
                     const prv = n(g[0].previsto);
                     return [
                       <tr key={`p${parte}`} className="sec"><td colSpan={7}>{parte}</td></tr>,
@@ -92,7 +95,7 @@ function Volumes({ volumes, canteiros, tipoSel, setTipoSel }: { volumes: Saldo[]
                           <td className="r num">{num(n(v.recebido) * n(v.peso_unit), 1)}</td>
                           {i === 0 && (
                             <td className="r num" rowSpan={g.length} style={{ verticalAlign: 'middle', fontSize: 16, fontWeight: 700, background: 'var(--rec)', borderLeft: '2px solid var(--line)', color: cc >= prv ? 'var(--ok)' : undefined }}>
-                              {num(cc)}<div className="muted" style={{ fontSize: 11.5, fontWeight: 400 }}>de {num(prv)}</div>
+                              {num(cc)}<div className="muted" style={{ fontSize: 11.5, fontWeight: 400 }}>de {num(prv)}{doControle === undefined ? ' · calculado' : ''}</div>
                             </td>
                           )}
                         </tr>
