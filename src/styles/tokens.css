@@ -1,46 +1,19 @@
 /*
-  Camada de aparência — PROVISÓRIA.
-  A direção visual ainda será definida com o usuário. Todas as telas usam só estes tokens;
-  trocar a aparência = reescrever este arquivo (e base.css), sem mexer nas telas.
+  Ponte para as telas que ainda usam os nomes antigos de variável.
+  As cores de verdade estão em controle.css (:root).
 */
 :root {
-  --cor-fundo: #ffffff;
-  --cor-superficie: #f5f5f5;
-  --cor-texto: #111111;
-  --cor-texto-suave: #666666;
-  --cor-linha: #d9d9d9;
-  --cor-acento: #111111;
-  --cor-erro: #b00020;
-
-  --fonte-texto: system-ui, -apple-system, "Segoe UI", sans-serif;
-  --fonte-dados: ui-monospace, "Cascadia Mono", Consolas, monospace;
-
-  --tam-1: 12px;
-  --tam-2: 14px;
-  --tam-3: 16px;
-  --tam-4: 20px;
-  --tam-5: 28px;
-
-  --esp-1: 4px;
-  --esp-2: 8px;
-  --esp-3: 12px;
-  --esp-4: 16px;
-  --esp-5: 24px;
-  --esp-6: 40px;
-
+  --cor-fundo: var(--panel);
+  --cor-superficie: var(--bg);
+  --cor-texto: var(--ink);
+  --cor-texto-suave: var(--muted);
+  --cor-linha: var(--line);
+  --cor-acento: var(--navy);
+  --cor-erro: var(--falta);
+  --fonte-texto: var(--f);
+  --fonte-dados: var(--f);
+  --tam-1: 12px; --tam-2: 14px; --tam-3: 16px; --tam-4: 20px; --tam-5: 28px;
+  --esp-1: 4px; --esp-2: 8px; --esp-3: 12px; --esp-4: 16px; --esp-5: 24px; --esp-6: 40px;
   --raio: 0;
   --transicao: 120ms ease-out;
-}
-
-@media (prefers-color-scheme: dark) {
-  :root {
-    --cor-fundo: #121212;
-    --cor-superficie: #1c1c1c;
-    --cor-texto: #eeeeee;
-    --cor-texto-suave: #9a9a9a;
-    --cor-linha: #333333;
-    --cor-acento: #eeeeee;
-    --cor-erro: #ff6b81;
-    color-scheme: dark;
-  }
 }

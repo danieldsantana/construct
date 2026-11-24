@@ -1,14 +1,15 @@
 import { useMemo } from 'react';
 import { useSearchParams } from 'react-router';
 import { formatarMetros, useTorres, type Torre } from '../dados/torres';
+import { useEscopo } from '../lib/escopo';
+import { Titulo } from '../componentes/Titulo';
 import './Torres.css';
 
-// Filtros ficam na URL: dá para voltar, recarregar ou mandar o link com o mesmo recorte.
+// Linha e canteiro vêm do escopo (barra do topo); tipo, busca e tramo ficam na URL.
 export function Torres() {
   const { torres, carregando, erro } = useTorres();
+  const { inclui } = useEscopo();
   const [params, setParams] = useSearchParams();
-  const linha = params.get('linha') ?? '';
-  const canteiro = params.get('canteiro') ?? '';
   const tipos = (params.get('tipos') ?? '').split(',').filter(Boolean);
   const busca = params.get('q') ?? '';
   const tramo = params.get('tramo') ?? '';
@@ -16,7 +17,6 @@ export function Torres() {
   function mudar(chave: string, valor: string) {
     const p = new URLSearchParams(params);
     if (valor) p.set(chave, valor); else p.delete(chave);
-    if (chave === 'linha') { p.delete('canteiro'); p.delete('tramo'); }
     setParams(p, { replace: true });
   }
 
@@ -25,14 +25,9 @@ export function Torres() {
     mudar('tipos', novo.join(','));
   }
 
-  const linhas = useMemo(() => [...new Set(torres.map((t) => t.linha_sigla))], [torres]);
-  const canteiros = useMemo(
-    () => [...new Set(torres.filter((t) => !linha || t.linha_sigla === linha).map((t) => t.canteiro ?? ''))].filter(Boolean),
-    [torres, linha],
-  );
   const doRecorte = useMemo(
-    () => torres.filter((t) => (!linha || t.linha_sigla === linha) && (!canteiro || t.canteiro === canteiro)),
-    [torres, linha, canteiro],
+    () => torres.filter((t) => t.canteiro && inclui(t.linha_sigla, t.canteiro)),
+    [torres, inclui],
   );
   const contagemTipos = useMemo(() => {
     const m = new Map<string, number>();
@@ -47,27 +42,14 @@ export function Torres() {
       (!tramo || `${t.linha_sigla}-${t.tramo}` === tramo));
   }, [doRecorte, tipos, busca, tramo]);
 
-  if (carregando) return <p className="suave">Carregando torres…</p>;
-  if (erro) return <p className="erro">Não foi possível carregar as torres: {erro}</p>;
+  if (carregando) return <><Titulo texto="Torres" /><p className="muted">Carregando torres…</p></>;
+  if (erro) return <><Titulo texto="Torres" /><p className="warn">Não foi possível carregar as torres: {erro}</p></>;
 
   return (
     <div className="torres">
-      <div className="torres-cabeca">
-        <h1>Torres</h1>
-        <span className="suave num">{visiveis.length} de {torres.length}</span>
-      </div>
+      <Titulo texto="Torres"><span className="num">{visiveis.length} de {doRecorte.length}</span></Titulo>
 
       <div className="torres-filtros">
-        <div className="seg" role="group" aria-label="Linha">
-          <button aria-pressed={!linha} onClick={() => mudar('linha', '')}>Todas</button>
-          {linhas.map((l) => (
-            <button key={l} aria-pressed={linha === l} onClick={() => mudar('linha', l)}>{l}</button>
-          ))}
-        </div>
-        <select aria-label="Canteiro" value={canteiro} onChange={(e) => mudar('canteiro', e.target.value)}>
-          <option value="">Todos os canteiros</option>
-          {canteiros.map((c) => <option key={c} value={c}>{c}</option>)}
-        </select>
         <input type="search" aria-label="Buscar torre" placeholder="Buscar torre (ex. 8/2)" value={busca}
                onChange={(e) => mudar('q', e.target.value)} />
       </div>

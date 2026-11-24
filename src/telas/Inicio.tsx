@@ -1,54 +1,74 @@
 import { useMemo } from 'react';
 import { Link } from 'react-router';
+import { Porcentagem, Titulo } from '../componentes/Titulo';
+import { useEscopo } from '../lib/escopo';
+import { num } from '../lib/formato';
 import { useTorres } from '../dados/torres';
-import './Inicio.css';
+import { useSaldos } from '../dados/recebimento';
 
-type Bloco = { linha: string; canteiros: { nome: string; total: number; tipos: [string, number][] }[]; total: number };
-
+// Visão geral do escopo: torres por canteiro (LC) e peso de estrutura previsto × recebido (controles importados).
 export function Inicio() {
+  const { inclui } = useEscopo();
   const { torres, carregando, erro } = useTorres();
+  const saldos = useSaldos();
 
-  const blocos = useMemo<Bloco[]>(() => {
-    const porLinha = new Map<string, Map<string, Map<string, number>>>();
+  const canteiros = useMemo(() => {
+    const m = new Map<string, { linha: string; canteiro: string; ordem: number; tipos: Map<string, number>; total: number }>();
     for (const t of torres) {
-      const c = t.canteiro ?? '(sem canteiro)';
-      const linha = porLinha.get(t.linha_sigla) ?? new Map();
-      const cant = linha.get(c) ?? new Map<string, number>();
-      cant.set(t.tipo, (cant.get(t.tipo) ?? 0) + 1);
-      linha.set(c, cant);
-      porLinha.set(t.linha_sigla, linha);
+      if (!t.canteiro || !inclui(t.linha_sigla, t.canteiro)) continue;
+      const k = `${t.linha_sigla}|${t.canteiro}`;
+      const c = m.get(k) ?? { linha: t.linha_sigla, canteiro: t.canteiro, ordem: t.ordem, tipos: new Map(), total: 0 };
+      c.tipos.set(t.tipo, (c.tipos.get(t.tipo) ?? 0) + 1);
+      c.total += 1; c.ordem = Math.min(c.ordem, t.ordem);
+      m.set(k, c);
     }
-    return [...porLinha].map(([linha, cants]) => {
-      const canteiros = [...cants].map(([nome, tipos]) => {
-        const lista = [...tipos].sort((a, b) => b[1] - a[1]);
-        return { nome, tipos: lista, total: lista.reduce((s, [, n]) => s + n, 0) };
-      });
-      return { linha, canteiros, total: canteiros.reduce((s, c) => s + c.total, 0) };
-    });
-  }, [torres]);
+    return [...m.values()].sort((a, b) => a.linha.localeCompare(b.linha) || a.ordem - b.ordem);
+  }, [torres, inclui]);
 
-  if (carregando) return <p className="suave">Carregando torres…</p>;
-  if (erro) return <p className="erro">Não foi possível carregar as torres: {erro}</p>;
+  const peso = useMemo(() => {
+    const m = new Map<string, { prev: number; rec: number }>();
+    for (const s of saldos.dados) {
+      if (!s.parte || !s.peso_unit) continue;
+      const k = `${s.linha}|${s.canteiro}`;
+      const p = m.get(k) ?? { prev: 0, rec: 0 };
+      p.prev += Number(s.previsto) * Number(s.peso_unit);
+      p.rec += Number(s.recebido) * Number(s.peso_unit);
+      m.set(k, p);
+    }
+    return m;
+  }, [saldos.dados]);
+
+  if (carregando) return <><Titulo texto="Início" /><p className="muted">Carregando…</p></>;
+  if (erro) return <><Titulo texto="Início" /><p className="warn">Não foi possível carregar: {erro}</p></>;
 
   return (
-    <div className="inicio">
-      <h1>Obra</h1>
-      <p className="suave">Torres da Lista de Construção por canteiro, conforme a distribuição oficial.</p>
-      {blocos.map((b) => (
-        <section key={b.linha} className="inicio-linha">
-          <h2>{b.linha} <span className="suave num">{b.total} torres</span></h2>
-          <div className="inicio-canteiros">
-            {b.canteiros.map((c) => (
-              <Link key={c.nome} className="inicio-canteiro"
-                    to={`/torres?linha=${b.linha}&canteiro=${encodeURIComponent(c.nome)}`}>
-                <strong>{c.nome}</strong>
-                <span className="num">{c.total}</span>
-                <small className="suave">{c.tipos.map(([t, n]) => `${t} ${n}`).join(' · ')}</small>
-              </Link>
-            ))}
-          </div>
-        </section>
-      ))}
-    </div>
+    <>
+      <Titulo texto="Início" />
+      <div className="panel" style={{ overflow: 'auto' }}>
+        <table>
+          <thead><tr>
+            <th>Linha</th><th>Canteiro</th><th className="r">Torres (LC)</th><th>Tipos</th>
+            <th className="r">Peso previsto (t)</th><th className="r">Peso recebido (t)</th><th>Estrutura recebida</th>
+          </tr></thead>
+          <tbody>
+            {canteiros.map((c) => {
+              const p = peso.get(`${c.linha}|${c.canteiro}`);
+              return (
+                <tr key={c.linha + c.canteiro}>
+                  <td><b>{c.linha}</b></td>
+                  <td><Link to="/torres">{c.canteiro}</Link></td>
+                  <td className="r num">{c.total}</td>
+                  <td style={{ fontSize: 13 }}>{[...c.tipos].sort((a, b) => b[1] - a[1]).map(([t, q]) => `${t} ${q}`).join(' · ')}</td>
+                  <td className="r num prev">{p ? num(p.prev / 1000, 1) : '—'}</td>
+                  <td className="r num rec">{p ? num(p.rec / 1000, 1) : '—'}</td>
+                  <td>{p ? <Porcentagem valor={p.prev ? p.rec / p.prev : 0} /> : <span className="muted">controle não importado</span>}</td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+      </div>
+      <p className="muted" style={{ fontSize: 13 }}>Torres: Lista de Construção. Peso: volumes de estrutura dos controles importados (recebido × peso unitário da VOLUMES RECEBIDOS).</p>
+    </>
   );
 }
