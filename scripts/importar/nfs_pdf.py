@@ -20,15 +20,10 @@ import fitz  # PyMuPDF
 from psycopg2.extras import execute_values
 
 sys.path.insert(0, Path(__file__).parent.as_posix())
-from comum import DADOS, conectar  # noqa: E402
+from comum import DADOS, conectar, numero_of  # noqa: E402
 
 PASTA = DADOS / "Notas" / "NFs emitidas"
 INDICE = PASTA / "_indice.csv"
-
-
-def numero_of(texto: str):
-    m = re.search(r"BRM-(\d+)", texto) or re.match(r"OF\s*-\s*(\d+)\b", texto)
-    return int(m.group(1)) if m else None
 
 
 def ler_pdf(caminho: Path):

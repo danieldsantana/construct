@@ -30,14 +30,18 @@ CHAVES = ["AP_PR_ANC", "AP_PR_SUSP", "AP_CABECA", "AP_TRONCO", "AP_EXT", "AP_PER
 def ler(arq: Path):
     wb = openpyxl.load_workbook(arq, read_only=True, data_only=True)
     aba = next(n for n in wb.sheetnames if n.upper().startswith("LISTA - ") and "COMPLETA" not in n.upper())
+    linhas = [list(r) + [None] * 32 for r in wb[aba].iter_rows(values_only=True)]
+    # cabeçalho "TORRE" na coluna B (d = 0) ou C (d = 1, layout deslocado do outro analista)
+    h, d = next((i, k) for i, r in enumerate(linhas[:8]) for k in (0, 1) if str(r[1 + k] or "").strip().upper() == "TORRE")
     torres = []
-    for r in wb[aba].iter_rows(min_row=4, values_only=True):
-        num = numero_torre(r[1] if len(r) > 1 else None)
+    for r in linhas[h + 1:]:
+        num = numero_torre(r[1 + d])
         if not num:
             continue
-        comp = {k: float(r[6 + i]) for i, k in enumerate(CHAVES) if len(r) > 6 + i and isinstance(r[6 + i], (int, float)) and r[6 + i]}
-        seq = r[28] if len(r) > 28 and isinstance(r[28], (int, float)) else None
-        torres.append({"num": num, "tipo": r[2], "status": str(r[5] or "").strip(), "seq": int(seq) if seq is not None else None, "comp": comp})
+        g = 6 + d  # 1ª coluna de composição (G ou H)
+        comp = {k: float(r[g + i]) for i, k in enumerate(CHAVES) if isinstance(r[g + i], (int, float)) and r[g + i]}
+        seq = r[28 + d] if isinstance(r[28 + d], (int, float)) else None
+        torres.append({"num": num, "tipo": r[2 + d], "status": str(r[5 + d] or "").strip(), "seq": int(seq) if seq is not None else None, "comp": comp})
     aba_t = next(n for n in wb.sheetnames if n.upper().startswith("TABELAS"))
     total_entregue = None
     for r in wb[aba_t].iter_rows(min_row=1, max_row=20, values_only=True):

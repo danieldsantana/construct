@@ -68,7 +68,7 @@ export function Inicio() {
           </tbody>
         </table>
       </div>
-      <p className="muted" style={{ fontSize: 13 }}>Torres: Lista de Construção. Peso: volumes de estrutura dos controles importados (recebido × peso unitário da VOLUMES RECEBIDOS).</p>
+      <p className="muted" style={{ fontSize: 13 }}>Torres: Lista de Construção. Peso: volumes de estrutura dos controles importados, recebido × peso unitário cadastrado (o do 1º controle que trouxe o volume). Os controles divergem em alguns pesos unitários (ex. para-raios 2,788 × 2,69 kg): até 0,4 t por canteiro em relação à VOLUMES RECEBIDOS de cada um. A referência vai ser a matriz de embalagem.</p>
     </>
   );
 }

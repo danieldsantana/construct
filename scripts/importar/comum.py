@@ -62,3 +62,16 @@ def numero_torre(valor) -> str | None:
         return None
     s = str(valor).strip().upper()
     return s if TORRE_RE.match(s) else None
+
+
+OF_ISA_RE = re.compile(r"BRM-(\d+)")
+OF_CURTA_RE = re.compile(r"^\s*OF\s*-\s*(\d+)\b")
+
+
+def numero_of(texto) -> int | None:
+    """Número da OF: 'OF-71607-EM-BRM-114' -> 114 · 'OF-114' / 'OF - 114' -> 114 · 'OFT', 'SAC …' -> None."""
+    if not texto:
+        return None
+    t = str(texto)
+    m = OF_ISA_RE.search(t) or OF_CURTA_RE.match(t)
+    return int(m.group(1)) if m else None

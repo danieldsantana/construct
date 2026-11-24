@@ -27,7 +27,7 @@ export function Estoque() {
     <>
       <Titulo texto="Estoque" />
       <Abas<Aba> abas={[['volumes', 'Volumes'], ['fixadores', 'Fixadores']]} atual={aba} aoMudar={setAba} />
-      {doEscopo.length === 0 && <div className="callout">Nada previsto para este escopo nos dados importados. Por enquanto só os controles do T4 (Juazeiro e Laje dos Negros) estão no banco.</div>}
+      {doEscopo.length === 0 && <div className="callout">Nada previsto para este escopo nos dados importados.</div>}
       {aba === 'volumes'
         ? <Volumes volumes={volumes} canteiros={canteiros} tipoSel={tipoSel} setTipoSel={setTipoSel} />
         : <Fixadores fixadores={fixadores} canteiros={canteiros} />}

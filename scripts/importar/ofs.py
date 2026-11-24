@@ -21,7 +21,7 @@ import openpyxl
 from psycopg2.extras import execute_values
 
 sys.path.insert(0, Path(__file__).parent.as_posix())
-from comum import DADOS, conectar, numero, sem_acento  # noqa: E402
+from comum import DADOS, conectar, numero, numero_of, sem_acento  # noqa: E402
 
 ARQ = DADOS / "OF e controles cliente" / "Lote 01 - Resumo OFs_29.10.26.xlsx"
 ABA = "OFs BRAMETAL"
@@ -32,11 +32,6 @@ CANTEIRO = {"LAJES DOS NEGROS": "Laje dos Negros"}
 
 def data(v):
     return v.date() if isinstance(v, dt.datetime) else v if isinstance(v, dt.date) else None
-
-
-def numero_of(codigo: str):
-    m = re.search(r"BRM-(\d+)", codigo)
-    return int(m.group(1)) if m else None
 
 
 def ler():

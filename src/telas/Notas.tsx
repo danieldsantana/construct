@@ -9,7 +9,7 @@ import {
 } from '../dados/recebimento';
 
 type Vista = 'lista' | 'planilha';
-type Filtro = 'todas' | 'nao_recebida' | 'recebidas' | 'sem_controle' | 'outros';
+type Filtro = 'todas' | 'nao_recebida' | 'recebidas' | 'reposicao' | 'sem_controle' | 'outros';
 type Linha =
   | { k: 'nf'; id: string; nf: NotaFiscal; quando: string }
   | { k: 'mov'; id: string; mov: Recebimento; quando: string };
@@ -19,6 +19,7 @@ export const SITUACAO: Record<SituacaoNF, [string, string, string]> = {
   em_conferencia: ['Em conferência', 'conf', 'Recebida, conferência em andamento.'],
   confirmada: ['Recebida', 'ok', 'Lançada no controle do canteiro.'],
   sem_controle: ['Sem controle importado', 'info', 'O controle do canteiro de destino ainda não está no banco: não dá para saber se foi recebida.'],
+  reposicao: ['Reposição (SAC)', 'rnc', 'NF de reposição de SAC não lançada no controle de estruturas (os controles em geral não lançam reposições): acompanhar pela RNC.'],
 };
 const HOJE = new Date();
 const dias = (iso: string | null) => (iso ? Math.floor((HOJE.getTime() - new Date(iso + 'T12:00:00').getTime()) / 86400000) : null);
@@ -63,7 +64,7 @@ export function Notas() {
   if (carregando) return <><Titulo texto="Notas fiscais" /><p className="muted">Carregando…</p></>;
   if (erro) return <><Titulo texto="Notas fiscais" /><p className="warn">Não foi possível carregar: {erro}</p></>;
 
-  const filtros: [Filtro, string][] = [['todas', 'Todas'], ['nao_recebida', 'Não recebidas'], ['recebidas', 'Recebidas'], ['sem_controle', 'Sem controle importado'], ['outros', 'Transferências e ajustes']];
+  const filtros: [Filtro, string][] = [['todas', 'Todas'], ['nao_recebida', 'Não recebidas'], ['recebidas', 'Recebidas'], ['reposicao', 'Reposições (SAC)'], ['sem_controle', 'Sem controle importado'], ['outros', 'Transferências e ajustes']];
 
   return (
     <>

@@ -51,7 +51,7 @@ export const useSaldos = () =>
   useTabela<Saldo>('saldo_material_detalhe', 'linha_id, linha, canteiro_id, canteiro, material_id, secao, descricao, parte, tipo, unidade, peso_unit, ordem, previsto, recebido, saido, saldo', ['linha_id', 'canteiro_id', 'material_id']);
 
 // Uma linha por NF (emitidas pelo índice dos PDFs + recebidas pelos controles).
-export type SituacaoNF = 'nao_recebida' | 'em_conferencia' | 'confirmada' | 'sem_controle';
+export type SituacaoNF = 'nao_recebida' | 'em_conferencia' | 'confirmada' | 'sem_controle' | 'reposicao';
 export type NotaFiscal = {
   id: number; numero: string; emissao: string | null; fornecedor: string | null; of_texto: string | null;
   romaneio: string | null; valor: number | null; peso: number | null; arquivo: string | null; sac: string | null; rnc: string | null;
