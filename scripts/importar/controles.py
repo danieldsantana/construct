@@ -179,8 +179,10 @@ def importar(cur, arq, linha, canteiro, tipo_id):
                on conflict (numero) do update set
                  emissao = coalesce(public.nota_fiscal.emissao, excluded.emissao),
                  fornecedor = coalesce(public.nota_fiscal.fornecedor, excluded.fornecedor),
-                 of_texto = coalesce(public.nota_fiscal.of_texto, excluded.of_texto),
-                 of_numero = coalesce(public.nota_fiscal.of_numero, excluded.of_numero),
+                 -- OF do controle prevalece sobre a lida do PDF (nfs_pdf.py só preenche o que falta)
+                 of_texto = coalesce(excluded.of_texto, public.nota_fiscal.of_texto),
+                 of_numero = coalesce(excluded.of_numero, public.nota_fiscal.of_numero),
+                 of_fonte = case when excluded.of_texto is not null then 'controle' else public.nota_fiscal.of_fonte end,
                  romaneio = coalesce(public.nota_fiscal.romaneio, excluded.romaneio),
                  valor = coalesce(public.nota_fiscal.valor, excluded.valor),
                  peso = coalesce(public.nota_fiscal.peso, excluded.peso),
@@ -189,6 +191,8 @@ def importar(cur, arq, linha, canteiro, tipo_id):
                returning numero, id""", list(nfs.values()), template="(%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s::public.situacao_nf,%s,%s)",
             page_size=1000, fetch=True)
         nf_id = dict(res)
+        cur.execute("update public.nota_fiscal set of_fonte = 'controle' where of_texto is not null and of_fonte is null and id = any(%s)",
+                    (list(nf_id.values()),))
     linhas_mov = []
     for c in colunas:
         tipo = "recebimento" if c["nf"] else "transferencia"

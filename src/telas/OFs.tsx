@@ -4,6 +4,7 @@ import { Porcentagem, Titulo } from '../componentes/Titulo';
 import { Gaveta } from '../componentes/Gaveta';
 import { useEscopo } from '../lib/escopo';
 import { data, num } from '../lib/formato';
+import { SITUACAO } from './Notas';
 import { ofCurta, useOFItens, useOFNFs, useOFs, type OF, type OFItem, type OFNF } from '../dados/ofs';
 
 const n = (v: number | string | null | undefined) => Number(v ?? 0);
@@ -40,7 +41,8 @@ export function OFs() {
 
   const prev = doEscopo.reduce((s, o) => s + n(o.peso_previsto), 0);
   const rec = doEscopo.reduce((s, o) => s + n(o.peso_recebido), 0);
-  const semNF = doEscopo.filter((o) => o.linha === 'T3' && n(o.nfs) === 0).length;
+  const naoRec = doEscopo.reduce((s, o) => s + n(o.nfs_nao_recebidas), 0);
+  const semCtrl = doEscopo.reduce((s, o) => s + n(o.nfs_sem_controle), 0);
   const sel = selId ? ofs.dados.find((o) => o.id === selId) ?? null : null;
 
   return (
@@ -48,10 +50,15 @@ export function OFs() {
       <Titulo texto="OFs"><span className="num">{doEscopo.length} OFs · {num(prev / 1000, 1)} t</span></Titulo>
       <div className="notes">
         Fonte: resumo de OFs do cliente (OFs BRAMETAL). <b>Atendimento por peso</b> = peso das NFs recebidas que citam a OF ÷ peso da OF.
-        Hoje a OF da NF vem da linha "Ordem de Fabricação" dos controles do T4; nos controles do T3 essa linha não existe.
+        A OF da NF vem da linha "Ordem de Fabricação" dos controles do T4 ou, nas demais, do campo "OC:" do PDF da NF (os dois conferem onde existem juntos).
         {' '}<b>Atendimento por componentes</b> entra depois de combinarmos o de-para entre os itens da OF e os volumes do controle.
       </div>
-      {semNF > 0 && <div className="callout">{semNF} OF(s) do T3 sem NF vinculada: a OF dessas NFs ainda não foi lida (está no PDF da NF, campo "OC:").</div>}
+      {(naoRec > 0 || semCtrl > 0) && (
+        <div className="callout">
+          NFs emitidas destas OFs que não aparecem como recebidas: <b>{naoRec}</b> não recebida(s) no canteiro de destino
+          {semCtrl > 0 && <> · <b>{semCtrl}</b> com destino em canteiro cujo controle ainda não foi importado</>}.
+        </div>
+      )}
 
       <section className="panel">
         <div className="tramo-h">
@@ -63,7 +70,8 @@ export function OFs() {
           <table>
             <thead><tr>
               <th>OF</th><th>Linha</th><th>Canteiro de entrega</th><th>Emitida</th><th>Entrega prevista</th>
-              <th className="r">Itens</th><th className="r">Peso OF (t)</th><th className="r">NFs recebidas</th><th className="r">Peso NFs (t)</th><th>Atendido</th>
+              <th className="r">Itens</th><th className="r">Peso OF (t)</th><th className="r">NFs emitidas</th><th className="r">Recebidas</th>
+              <th className="r" title="Não recebidas + destino sem controle importado">Não recebidas</th><th className="r">Peso NFs rec. (t)</th><th>Atendido</th>
             </tr></thead>
             <tbody>
               {doEscopo.map((o) => <Linha key={o.id} o={o} sel={o.id === selId} abrir={() => abrir(o.id)} />)}
@@ -90,7 +98,12 @@ export function Linha({ o, sel, abrir }: { o: OF; sel: boolean; abrir: () => voi
       <td className="num">{o.entrega_prevista ? data(o.entrega_prevista) : o.entrega_texto ?? '—'}{passou && <> <span className="st falta" title="Entrega prevista já passou e o peso recebido não chegou a 100%">vencida</span></>}</td>
       <td className="r num">{o.itens}</td>
       <td className="r num prev">{num(n(o.peso_previsto) / 1000, 1)}</td>
+      <td className="r num">{o.nfs || ''}</td>
       <td className="r num">{o.nfs_recebidas || ''}</td>
+      <td className="r num">
+        {n(o.nfs_nao_recebidas) > 0 && <span className="warn">{o.nfs_nao_recebidas}</span>}
+        {n(o.nfs_sem_controle) > 0 && <span className="muted" title="destino em canteiro sem controle importado">{n(o.nfs_nao_recebidas) > 0 ? ' + ' : ''}{o.nfs_sem_controle}?</span>}
+      </td>
       <td className="r num rec">{n(o.peso_recebido) ? num(n(o.peso_recebido) / 1000, 1) : ''}</td>
       <td><Porcentagem valor={pct} ok={pct >= 1} /></td>
     </tr>
@@ -99,6 +112,7 @@ export function Linha({ o, sel, abrir }: { o: OF; sel: boolean; abrir: () => voi
 
 export function FichaOF({ o, itens, nfs, aoFechar }: { o: OF | null; itens: OFItem[]; nfs: OFNF[]; aoFechar: () => void }) {
   const recebidas = nfs.filter((x) => x.situacao !== 'nao_recebida').sort((a, b) => (a.recebida_em ?? '').localeCompare(b.recebida_em ?? ''));
+  const pendentes = nfs.filter((x) => x.situacao === 'nao_recebida').sort((a, b) => (a.emissao ?? '').localeCompare(b.emissao ?? ''));
   const porCanteiro = new Map<string, number>();
   for (const x of recebidas) { const k = x.canteiro_recebimento ?? '—'; porCanteiro.set(k, (porCanteiro.get(k) ?? 0) + n(x.peso)); }
   const tipos = [...new Set(itens.map((i) => i.tipo_torre))];
@@ -127,24 +141,36 @@ export function FichaOF({ o, itens, nfs, aoFechar }: { o: OF | null; itens: OFIt
             </table>
           </section>
           <section>
-            <h3 className="dr-t">NFs recebidas com esta OF</h3>
-            {recebidas.length ? (
+            <h3 className="dr-t">NFs desta OF ({nfs.length})</h3>
+            {nfs.length ? (
               <>
-                <p className="muted" style={{ fontSize: 12.5, margin: '0 0 6px' }}>
-                  Por canteiro de recebimento: {[...porCanteiro].map(([c, p]) => `${c} ${num(p / 1000, 1)} t`).join(' · ')}
-                </p>
+                {recebidas.length > 0 && (
+                  <p className="muted" style={{ fontSize: 12.5, margin: '0 0 6px' }}>
+                    Recebido por canteiro: {[...porCanteiro].map(([c, p]) => `${c} ${num(p / 1000, 1)} t`).join(' · ')}
+                  </p>
+                )}
                 <table>
-                  <thead><tr><th>NF</th><th>Emissão</th><th>Recebida</th><th>Canteiro</th><th className="r">Peso (kg)</th></tr></thead>
+                  <thead><tr><th>NF</th><th>Emissão</th><th>Situação</th><th>Destino / recebida em</th><th className="r">Peso (kg)</th></tr></thead>
                   <tbody>
-                    {recebidas.map((x) => (
-                      <tr key={x.nf_id}><td><b>{x.numero}</b></td><td className="num">{data(x.emissao)}</td><td className="num">{data(x.recebida_em)}</td>
-                        <td>{x.canteiro_recebimento ?? '—'}{x.canteiro_recebimento && o.canteiro && x.canteiro_recebimento !== o.canteiro && <span className="st neutro" style={{ marginLeft: 6 }}>fora do canteiro da OF</span>}</td>
-                        <td className="r num">{num(x.peso, 1)}</td></tr>
-                    ))}
+                    {[...recebidas, ...pendentes].map((x) => {
+                      const s = SITUACAO[x.situacao_exibida];
+                      const onde = x.canteiro_recebimento ?? x.destino;
+                      return (
+                        <tr key={x.nf_id}>
+                          <td><b>{x.numero}</b>{(x.sac || x.rnc) && <span className="st rnc" style={{ marginLeft: 6 }} title={`SAC ${x.sac ?? '—'} · RNC ${x.rnc ?? '—'}`}>SAC</span>}</td>
+                          <td className="num">{data(x.emissao)}</td>
+                          <td><span className={`st ${s[1]}`} title={s[2]}>{s[0]}</span></td>
+                          <td>{onde ?? '—'}{x.recebida_em && <span className="muted num"> · {data(x.recebida_em)}</span>}
+                            {onde && o.canteiro && onde !== o.canteiro && <span className="st neutro" style={{ marginLeft: 6 }}>fora do canteiro da OF</span>}</td>
+                          <td className="r num">{num(x.peso, 1)}</td>
+                        </tr>
+                      );
+                    })}
                   </tbody>
                 </table>
+                <p className="muted" style={{ fontSize: 12, margin: '6px 0 0' }}>Peso só das NFs recebidas (vem do controle). NF não recebida não tem peso lido ainda.</p>
               </>
-            ) : <p className="muted">Nenhuma NF recebida cita esta OF{o.linha === 'T3' ? ' (no T3 a OF da NF ainda não foi lida dos PDFs)' : ''}.</p>}
+            ) : <p className="muted">Nenhuma NF cita esta OF.</p>}
           </section>
         </>
       )}

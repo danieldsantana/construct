@@ -14,7 +14,7 @@ type Linha =
   | { k: 'nf'; id: string; nf: NotaFiscal; quando: string }
   | { k: 'mov'; id: string; mov: Recebimento; quando: string };
 
-const SITUACAO: Record<SituacaoNF, [string, string, string]> = {
+export const SITUACAO: Record<SituacaoNF, [string, string, string]> = {
   nao_recebida: ['Não recebida', 'neutro', 'Emitida (PDF chegou por e-mail) e ainda não lançada no controle do canteiro de destino.'],
   em_conferencia: ['Em conferência', 'conf', 'Recebida, conferência em andamento.'],
   confirmada: ['Recebida', 'ok', 'Lançada no controle do canteiro.'],

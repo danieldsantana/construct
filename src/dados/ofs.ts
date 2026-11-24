@@ -1,4 +1,5 @@
 import { useTabela } from '../lib/dados';
+import type { SituacaoNF } from './recebimento';
 
 // Uma linha por OF (cabeçalho + previsto dos itens + NFs recebidas que citam a OF).
 export type OF = {
@@ -7,11 +8,13 @@ export type OF = {
   linha: string; canteiro: string | null;
   itens: number; quantidade: number; peso_previsto: number;
   nfs: number; nfs_recebidas: number; peso_recebido: number; ultima_recebida: string | null;
+  nfs_nao_recebidas: number; nfs_sem_controle: number;
 };
 export type OFItem = { id: number; of_id: number; seq: number | null; tipo_torre: string; descricao: string; unidade: string | null; quantidade: number; peso_kg: number };
 export type OFNF = {
   of_id: number; nf_id: number; numero: string; emissao: string | null; peso: number | null;
   situacao: 'nao_recebida' | 'em_conferencia' | 'confirmada'; canteiro_recebimento: string | null; linha_nf: string | null; recebida_em: string | null;
+  situacao_exibida: SituacaoNF; destino: string | null; sac: string | null; rnc: string | null;
 };
 
 export const useOFs = () => useTabela<OF>('of_resumo', '*', ['linha', 'numero']);
