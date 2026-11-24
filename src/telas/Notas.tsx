@@ -3,74 +3,121 @@ import { Abas, Titulo } from '../componentes/Titulo';
 import { Gaveta } from '../componentes/Gaveta';
 import { useEscopo } from '../lib/escopo';
 import { colunaDaOrigem, data, num } from '../lib/formato';
-import { useLancamentos, useRecebimentos, useSaldos, type Recebimento } from '../dados/recebimento';
+import {
+  useLancamentos, useNotasFiscais, useRecebimentos, useSaldos,
+  type NotaFiscal, type Recebimento, type SituacaoNF,
+} from '../dados/recebimento';
 
 type Vista = 'lista' | 'planilha';
-type Filtro = 'todos' | 'nf' | 'transf';
+type Filtro = 'todas' | 'nao_recebida' | 'recebidas' | 'sem_controle' | 'outros';
+type Linha =
+  | { k: 'nf'; id: string; nf: NotaFiscal; quando: string }
+  | { k: 'mov'; id: string; mov: Recebimento; quando: string };
 
-// Notas fiscais = cada recebimento da ENTRADA (uma coluna do controle).
+const SITUACAO: Record<SituacaoNF, [string, string, string]> = {
+  nao_recebida: ['Não recebida', 'neutro', 'Emitida (PDF chegou por e-mail) e ainda não lançada no controle do canteiro de destino.'],
+  em_conferencia: ['Em conferência', 'conf', 'Recebida, conferência em andamento.'],
+  confirmada: ['Recebida', 'ok', 'Lançada no controle do canteiro.'],
+  sem_controle: ['Sem controle importado', 'info', 'O controle do canteiro de destino ainda não está no banco: não dá para saber se foi recebida.'],
+};
+const HOJE = new Date();
+const dias = (iso: string | null) => (iso ? Math.floor((HOJE.getTime() - new Date(iso + 'T12:00:00').getTime()) / 86400000) : null);
+
+// Notas fiscais: todas as emitidas (índice dos PDFs) e recebidas (controles), mais transferências e ajustes.
 export function Notas() {
-  const { inclui, canteiroUnico } = useEscopo();
+  const { inclui, escopo, canteiroUnico } = useEscopo();
+  const nfs = useNotasFiscais();
   const rec = useRecebimentos();
   const [vista, setVista] = useState<Vista>('lista');
-  const [filtro, setFiltro] = useState<Filtro>('todos');
-  const [of, setOf] = useState('');
-  const [aberto, setAberto] = useState<Recebimento | null>(null);
-  const fechar = useCallback(() => setAberto(null), []);
+  const [filtro, setFiltro] = useState<Filtro>('todas');
+  const [abertaNF, setAbertaNF] = useState<NotaFiscal | null>(null);
+  const [abertoMov, setAbertoMov] = useState<Recebimento | null>(null);
+  const fechar = useCallback(() => { setAbertaNF(null); setAbertoMov(null); }, []);
 
-  const doEscopo = useMemo(() => rec.dados.filter((r) => inclui(r.linha, r.canteiro)), [rec.dados, inclui]);
-  const ofs = useMemo(() => [...new Set(doEscopo.map((r) => r.of_texto).filter(Boolean) as string[])].sort(), [doEscopo]);
-  const visiveis = useMemo(() => doEscopo
-    .filter((r) => (filtro === 'todos' || (filtro === 'nf' ? r.tipo === 'recebimento' : r.tipo === 'transferencia')) && (!of || r.of_texto === of))
-    .sort((a, b) => (b.data ?? '').localeCompare(a.data ?? '') || colunaDaOrigem(b.origem) - colunaDaOrigem(a.origem)), [doEscopo, filtro, of]);
-  const variosCanteiros = new Set(doEscopo.map((r) => r.linha + r.canteiro)).size > 1;
+  // NF sem linha definida (reposição "ND"): entra se o canteiro estiver no escopo em qualquer linha
+  const nfNoEscopo = useCallback((n: NotaFiscal) => {
+    const c = n.canteiro_recebimento ?? n.destino ?? '';
+    if (n.linha) return inclui(n.linha, c);
+    return !escopo.canteiro ? inclui('T3', c) || inclui('T4', c) : c === escopo.canteiro;
+  }, [inclui, escopo.canteiro]);
 
-  if (rec.carregando) return <><Titulo texto="Notas fiscais" /><p className="muted">Carregando…</p></>;
-  if (rec.erro) return <><Titulo texto="Notas fiscais" /><p className="warn">Não foi possível carregar: {rec.erro}</p></>;
+  const linhas = useMemo<Linha[]>(() => [
+    ...nfs.dados.filter(nfNoEscopo).map((nf) => ({ k: 'nf' as const, id: `n${nf.id}`, nf, quando: nf.recebida_em ?? nf.emissao ?? '' })),
+    ...rec.dados.filter((r) => r.tipo !== 'recebimento' && inclui(r.linha, r.canteiro))
+      .map((mov) => ({ k: 'mov' as const, id: `m${mov.id}`, mov, quando: mov.data ?? '' })),
+  ], [nfs.dados, rec.dados, nfNoEscopo, inclui]);
 
-  const contagem = (f: Filtro) => doEscopo.filter((r) => f === 'todos' || (f === 'nf' ? r.tipo === 'recebimento' : r.tipo === 'transferencia')).length;
+  const passa = (l: Linha, f: Filtro) => {
+    if (f === 'todas') return true;
+    if (f === 'outros') return l.k === 'mov';
+    if (l.k !== 'nf') return false;
+    const s = l.nf.situacao_exibida;
+    return f === 'recebidas' ? s === 'confirmada' || s === 'em_conferencia' : s === f;
+  };
+  const visiveis = useMemo(() => linhas.filter((l) => passa(l, filtro)).sort((a, b) => b.quando.localeCompare(a.quando)),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [linhas, filtro]);
+
+  const carregando = nfs.carregando || rec.carregando;
+  const erro = nfs.erro ?? rec.erro;
+  if (carregando) return <><Titulo texto="Notas fiscais" /><p className="muted">Carregando…</p></>;
+  if (erro) return <><Titulo texto="Notas fiscais" /><p className="warn">Não foi possível carregar: {erro}</p></>;
+
+  const filtros: [Filtro, string][] = [['todas', 'Todas'], ['nao_recebida', 'Não recebidas'], ['recebidas', 'Recebidas'], ['sem_controle', 'Sem controle importado'], ['outros', 'Transferências e ajustes']];
 
   return (
     <>
-      <Titulo texto="Notas fiscais"><span className="num">{visiveis.length} recebimentos</span></Titulo>
-      <Abas<Vista> abas={[['lista', 'Recebimentos'], ['planilha', 'Planilha de entrada']]} atual={vista} aoMudar={setVista} />
-      {doEscopo.length === 0 && <div className="callout">Nenhum recebimento importado para este escopo. Por enquanto só os controles do T4 (Juazeiro e Laje dos Negros) estão no banco.</div>}
+      <Titulo texto="Notas fiscais"><span className="num">{visiveis.length}</span></Titulo>
+      <Abas<Vista> abas={[['lista', 'Notas fiscais'], ['planilha', 'Planilha de entrada']]} atual={vista} aoMudar={setVista} />
 
       {vista === 'lista' ? (
         <>
           <div className="toolbar">
             <div className="chips">
-              {([['todos', 'Todos'], ['nf', 'Notas fiscais'], ['transf', 'Transferências']] as [Filtro, string][]).map(([k, t]) => (
-                <button key={k} className={`chip ${filtro === k ? 'on' : ''}`} onClick={() => setFiltro(k)}>{t}<span className="n">{contagem(k)}</span></button>
+              {filtros.filter(([k]) => k === 'todas' || linhas.some((l) => passa(l, k))).map(([k, t]) => (
+                <button key={k} className={`chip ${filtro === k ? 'on' : ''}`} onClick={() => setFiltro(k)}>{t}<span className="n">{linhas.filter((l) => passa(l, k)).length}</span></button>
               ))}
-            </div>
-            <span className="grow" />
-            <div className="chips">
-              <button className={`chip ${!of ? 'on' : ''}`} onClick={() => setOf('')}>Todas as OFs</button>
-              {ofs.map((o) => <button key={o} className={`chip ${of === o ? 'on' : ''}`} onClick={() => setOf(o)}>{o}</button>)}
             </div>
           </div>
           <div className="panel" style={{ overflow: 'auto', maxHeight: 'calc(100vh - 290px)' }}>
             <table>
               <thead><tr>
-                <th>Situação</th><th>NF / documento</th><th>Emissão</th><th>Recebida</th><th>OF</th><th>Romaneio</th>
-                {variosCanteiros && <th>Canteiro</th>}<th className="r">Peso NF (kg)</th><th className="r">Valor (R$)</th><th className="r">Itens</th>
+                <th>Situação</th><th>NF / documento</th><th>Emissão</th><th>Recebida em</th><th className="r">Dias</th><th>OF</th>
+                <th>Destino (NF)</th><th>Canteiro</th><th className="r">Peso (kg)</th><th className="r">Itens</th><th>Observações</th>
               </tr></thead>
               <tbody>
-                {visiveis.map((r) => (
-                  <tr key={r.id} className="clk" onClick={() => setAberto(r)}>
-                    <td>{r.tipo === 'transferencia' ? <span className="st info">Transferência</span>
-                      : r.tipo === 'ajuste' ? <span className="st sf" title="Quantidade lançada fora de uma coluna de recebimento">Ajuste</span>
-                      : <span className="st ok">Recebida</span>}</td>
-                    <td className="num"><b>{r.numero ?? r.documento ?? '—'}</b></td>
-                    <td className="num">{data(r.emissao)}</td>
-                    <td className="num">{data(r.data)}</td>
-                    <td>{r.of_texto ?? '—'}</td>
-                    <td className="num">{r.romaneio ?? '—'}</td>
-                    {variosCanteiros && <td>{r.linha} · {r.canteiro}</td>}
-                    <td className="r num">{num(r.peso, 1)}</td>
-                    <td className="r num">{num(r.valor, 2)}</td>
-                    <td className="r num">{r.itens}</td>
+                {visiveis.map((l) => l.k === 'nf' ? (
+                  <tr key={l.id} className="clk" onClick={() => setAbertaNF(l.nf)}>
+                    <td><span className={`st ${SITUACAO[l.nf.situacao_exibida][1]}`} title={SITUACAO[l.nf.situacao_exibida][2]}>{SITUACAO[l.nf.situacao_exibida][0]}</span></td>
+                    <td className="num"><b>{l.nf.numero}</b></td>
+                    <td className="num">{data(l.nf.emissao)}</td>
+                    <td className="num">{data(l.nf.recebida_em)}</td>
+                    <td className="r num">{l.nf.situacao_exibida === 'nao_recebida' ? <span className="warn">{dias(l.nf.emissao)}</span> : ''}</td>
+                    <td>{l.nf.of_texto ?? '—'}</td>
+                    <td>{l.nf.destino ?? '—'}</td>
+                    <td>{l.nf.canteiro_recebimento ?? '—'}</td>
+                    <td className="r num">{num(l.nf.peso, 1)}</td>
+                    <td className="r num">{l.nf.itens || '—'}</td>
+                    <td style={{ fontSize: 13 }}>{[
+                      l.nf.rnc ? `RNC ${l.nf.rnc}` : '', l.nf.sac ? `SAC ${l.nf.sac}` : '',
+                      !l.nf.arquivo ? 'sem PDF no índice' : '',
+                      l.nf.destino && l.nf.canteiro_recebimento && l.nf.destino !== l.nf.canteiro_recebimento ? `recebida fora do destino` : '',
+                      l.nf.recebimentos > 1 ? `${l.nf.recebimentos} lançamentos` : '',
+                    ].filter(Boolean).join(' · ')}</td>
+                  </tr>
+                ) : (
+                  <tr key={l.id} className="clk" onClick={() => setAbertoMov(l.mov)}>
+                    <td>{l.mov.tipo === 'ajuste' ? <span className="st sf">Ajuste</span> : <span className="st info">Transferência</span>}</td>
+                    <td className="num"><b>{l.mov.documento ?? '—'}</b></td>
+                    <td className="num">—</td>
+                    <td className="num">{data(l.mov.data)}</td>
+                    <td />
+                    <td>—</td>
+                    <td>—</td>
+                    <td>{l.mov.canteiro}</td>
+                    <td className="r num">—</td>
+                    <td className="r num">{l.mov.itens}</td>
+                    <td style={{ fontSize: 13 }}>{l.mov.tipo === 'ajuste' ? 'quantidade lançada na coluna E da ENTRADA' : ''}</td>
                   </tr>
                 ))}
               </tbody>
@@ -78,12 +125,14 @@ export function Notas() {
           </div>
         </>
       ) : canteiroUnico ? (
-        <PlanilhaEntrada linha={canteiroUnico.linha} canteiro={canteiroUnico.canteiro} aoAbrir={setAberto} recebimentos={doEscopo} />
+        <PlanilhaEntrada linha={canteiroUnico.linha} canteiro={canteiroUnico.canteiro} aoAbrir={setAbertoMov}
+                         recebimentos={rec.dados.filter((r) => inclui(r.linha, r.canteiro))} />
       ) : (
         <div className="callout">A planilha de entrada é por canteiro, como no controle. Escolha uma linha e um canteiro na barra de escopo.</div>
       )}
 
-      <FichaRecebimento r={aberto} aoFechar={fechar} />
+      <FichaNF nf={abertaNF} recebimentos={rec.dados} aoFechar={fechar} />
+      <FichaRecebimento r={abertoMov} aoFechar={fechar} />
     </>
   );
 }
@@ -102,19 +151,20 @@ function PlanilhaEntrada({ linha, canteiro, recebimentos, aoAbrir }: { linha: st
     for (const l of lanc.dados) if (ids.has(l.movimento_id)) m.set(`${l.material_id}|${l.movimento_id}`, Number(l.quantidade));
     return m;
   }, [lanc.dados, colunas]);
-  const linhas = useMemo(() => saldos.dados
+  const itens = useMemo(() => saldos.dados
     .filter((s) => s.linha === linha && s.canteiro === canteiro && (Number(s.previsto) !== 0 || Number(s.recebido) !== 0))
     .sort((a, b) => a.ordem - b.ordem), [saldos.dados, linha, canteiro]);
 
   if (saldos.carregando || lanc.carregando) return <p className="muted">Carregando…</p>;
   if (saldos.erro || lanc.erro) return <p className="warn">Não foi possível carregar: {saldos.erro ?? lanc.erro}</p>;
+  if (!colunas.length) return <div className="callout">Nenhum recebimento importado para {linha} · {canteiro}.</div>;
 
   let secao = '';
   return (
     <>
       <div className="toolbar">
-        <span className="muted">{mostrar.length} de {colunas.length} colunas · só itens com previsto ou recebimento · clique no número da NF para abrir</span>
-        <button onClick={() => setTodas(!todas)}>{todas ? 'Só as 25 mais recentes' : 'Todas as colunas'}</button>
+        <span className="muted">{mostrar.length} de {colunas.length} colunas, na ordem do controle · só itens com previsto ou recebimento · clique no número da NF para abrir</span>
+        <button onClick={() => setTodas(!todas)}>{todas ? 'Só as 25 últimas' : 'Todas as colunas'}</button>
       </div>
       <div className="panel planilha" style={{ overflow: 'auto', maxHeight: 'calc(100vh - 300px)' }}>
         <table>
@@ -127,7 +177,7 @@ function PlanilhaEntrada({ linha, canteiro, recebimentos, aoAbrir }: { linha: st
             ))}
           </tr></thead>
           <tbody>
-            {linhas.flatMap((s) => {
+            {itens.flatMap((s) => {
               const out = [];
               if (s.secao !== secao) {
                 secao = s.secao;
@@ -154,43 +204,74 @@ function PlanilhaEntrada({ linha, canteiro, recebimentos, aoAbrir }: { linha: st
   );
 }
 
-function FichaRecebimento({ r, aoFechar }: { r: Recebimento | null; aoFechar: () => void }) {
+function ItensDosMovimentos({ movimentos }: { movimentos: Recebimento[] }) {
   const saldos = useSaldos();
   const lanc = useLancamentos();
-  const itens = useMemo(() => {
-    if (!r) return [];
-    const mat = new Map(saldos.dados.filter((s) => s.linha_id === r.linha_id && s.canteiro_id === r.canteiro_id).map((s) => [s.material_id, s]));
-    return lanc.dados.filter((l) => l.movimento_id === r.id)
-      .map((l) => ({ q: Number(l.quantidade), m: mat.get(l.material_id) }))
+  const linhas = useMemo(() => {
+    const mat = new Map(saldos.dados.map((s) => [`${s.linha_id}|${s.canteiro_id}|${s.material_id}`, s]));
+    const ids = new Map(movimentos.map((m) => [m.id, m]));
+    return lanc.dados.filter((l) => ids.has(l.movimento_id))
+      .map((l) => ({ q: Number(l.quantidade), mov: ids.get(l.movimento_id)!, m: mat.get(`${l.linha_id}|${l.canteiro_id}|${l.material_id}`) }))
       .sort((a, b) => (a.m?.ordem ?? 0) - (b.m?.ordem ?? 0));
-  }, [r, saldos.dados, lanc.dados]);
-
+  }, [movimentos, saldos.dados, lanc.dados]);
+  if (!movimentos.length) return <p className="muted" style={{ margin: 0 }}>Ainda não recebida: nenhum item lançado. Os itens do romaneio (lidos do PDF) entram numa próxima etapa.</p>;
   let secao = '';
+  const varios = movimentos.length > 1;
   return (
-    <Gaveta aberta={!!r} aoFechar={aoFechar}
-            sub={r ? `${r.tipo === 'transferencia' ? 'Transferência' : r.tipo === 'ajuste' ? 'Ajuste' : 'Nota fiscal'} · ${r.linha} · ${r.canteiro}` : ''}
-            titulo={r ? (r.numero ? `NF ${r.numero}` : r.documento ?? 'Transferência') : ''}
-            resumo={r ? [['Recebida', data(r.data)], ['OF', r.of_texto ?? '—'], ['Peso', r.peso ? `${num(r.peso, 1)} kg` : '—'], ['Itens', r.itens]] : []}>
-      {r && (
+    <table>
+      <thead><tr><th>Item</th>{varios && <th>Canteiro / data</th>}<th className="r">Qtd</th></tr></thead>
+      <tbody>
+        {linhas.flatMap(({ q, m, mov }, i) => {
+          const out = [];
+          if (m && m.secao !== secao) { secao = m.secao; out.push(<tr key={`s${i}`} className="sec"><td colSpan={varios ? 3 : 2}>{m.secao}</td></tr>); }
+          out.push(<tr key={i}><td>{m?.descricao ?? '?'}</td>{varios && <td>{mov.canteiro} · {data(mov.data, true)}</td>}<td className={`r num ${q < 0 ? 'warn' : ''}`}>{num(q)} {m?.unidade}</td></tr>);
+          return out;
+        })}
+      </tbody>
+    </table>
+  );
+}
+
+function FichaNF({ nf, recebimentos, aoFechar }: { nf: NotaFiscal | null; recebimentos: Recebimento[]; aoFechar: () => void }) {
+  const movs = useMemo(() => (nf ? recebimentos.filter((r) => r.nf_id === nf.id) : []), [nf, recebimentos]);
+  const s = nf ? SITUACAO[nf.situacao_exibida] : null;
+  return (
+    <Gaveta aberta={!!nf} aoFechar={aoFechar} sub={nf ? `Nota fiscal · ${nf.linha ?? 'linha não definida'}` : ''} titulo={nf ? `NF ${nf.numero}` : ''}
+            resumo={nf ? [['Situação', <span className={`st ${s![1]}`}>{s![0]}</span>], ['OF', nf.of_texto ?? '—'], ['Peso', nf.peso ? `${num(nf.peso, 1)} kg` : '—'], ['Itens', nf.itens || '—']] : []}>
+      {nf && (
         <>
+          <div className="passos">
+            <div className="feito"><b>Emitida</b><span className="muted">{data(nf.emissao)}</span></div>
+            <div className={nf.recebida_em ? 'feito' : 'atual'}><b>Recebida</b><span className="muted">{nf.recebida_em ? `${data(nf.recebida_em)} · ${nf.canteiro_recebimento}` : '—'}</span></div>
+          </div>
+          {nf.situacao_exibida === 'nao_recebida' && <div className="callout">Emitida há {dias(nf.emissao)} dias e ainda não lançada no controle de {nf.destino}.</div>}
+          {nf.situacao_exibida === 'sem_controle' && <div className="callout">{SITUACAO.sem_controle[2]}</div>}
+          {nf.destino && nf.canteiro_recebimento && nf.destino !== nf.canteiro_recebimento && <div className="callout">Destino na NF: {nf.destino}. Recebida em {nf.canteiro_recebimento}.</div>}
           <div className="fields">
-            <div><span>Emissão</span><b>{data(r.emissao)}</b></div>
-            <div><span>Romaneio</span><b>{r.romaneio ?? '—'}</b></div>
-            <div><span>Fornecedor</span><b>{r.fornecedor ?? '—'}</b></div>
-            <div><span>Valor</span><b>{r.valor ? `R$ ${num(r.valor, 2)}` : '—'}</b></div>
+            <div><span>Destino (NF)</span><b>{nf.destino ?? '—'}</b></div>
+            <div><span>Romaneio</span><b>{nf.romaneio ?? '—'}</b></div>
+            <div><span>Valor</span><b>{nf.valor ? `R$ ${num(nf.valor, 2)}` : '—'}</b></div>
+            <div><span>SAC / RNC</span><b>{[nf.sac && `SAC ${nf.sac}`, nf.rnc && `RNC ${nf.rnc}`].filter(Boolean).join(' · ') || '—'}</b></div>
+            <div style={{ gridColumn: '1 / -1' }}><span>Arquivo</span><b style={{ fontSize: 13 }}>{nf.arquivo ?? 'sem PDF no índice'}</b></div>
           </div>
           <h2>Itens recebidos</h2>
-          <table>
-            <thead><tr><th>Item</th><th className="r">Qtd</th></tr></thead>
-            <tbody>
-              {itens.flatMap(({ q, m }, i) => {
-                const out = [];
-                if (m && m.secao !== secao) { secao = m.secao; out.push(<tr key={`s${i}`} className="sec"><td colSpan={2}>{m.secao}</td></tr>); }
-                out.push(<tr key={i}><td>{m?.descricao ?? '?'}</td><td className={`r num ${q < 0 ? 'warn' : ''}`}>{num(q)} {m?.unidade}</td></tr>);
-                return out;
-              })}
-            </tbody>
-          </table>
+          <ItensDosMovimentos movimentos={movs} />
+        </>
+      )}
+    </Gaveta>
+  );
+}
+
+function FichaRecebimento({ r, aoFechar }: { r: Recebimento | null; aoFechar: () => void }) {
+  return (
+    <Gaveta aberta={!!r} aoFechar={aoFechar}
+            sub={r ? `${r.tipo === 'transferencia' ? 'Transferência' : r.tipo === 'ajuste' ? 'Ajuste' : 'Recebimento'} · ${r.linha} · ${r.canteiro}` : ''}
+            titulo={r ? (r.numero ? `NF ${r.numero}` : r.documento ?? '—') : ''}
+            resumo={r ? [['Data', data(r.data)], ['OF', r.of_texto ?? '—'], ['Peso NF', r.peso ? `${num(r.peso, 1)} kg` : '—'], ['Itens', r.itens]] : []}>
+      {r && (
+        <>
+          {r.tipo === 'ajuste' && <div className="callout">Quantidade digitada na coluna E da ENTRADA (a coluna dos rótulos), sem NF nem data. A planilha conta como recebida; confira a qual recebimento pertence.</div>}
+          <ItensDosMovimentos movimentos={[r]} />
           <p className="muted" style={{ margin: 0, fontSize: 12.5 }}>Origem: {r.origem.replace('controle:', 'controle ').replace('#', ', coluna ')}</p>
         </>
       )}
