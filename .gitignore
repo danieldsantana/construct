@@ -1,0 +1,46 @@
+# --- Nunca versionar: arquivos-base da obra e contexto do Claude ---
+Dados criação/
+Dados cria*/
+_contexto/
+CLAUDE.md
+CLAUDE.local.md
+.claude/
+
+# Qualquer planilha, PDF ou CSV (dados da obra), onde quer que estejam
+*.xlsx
+*.xlsm
+*.xls
+*.csv
+*.pdf
+
+# Segredos
+.env
+.env.*
+!.env.example
+
+# Backups / dumps
+*.dump
+*.sql.gz
+*.backup
+backups/
+
+# Node / build
+node_modules/
+dist/
+.vite/
+
+# Python
+__pycache__/
+*.pyc
+.venv/
+venv/
+
+# Supabase local
+supabase/.temp/
+supabase/.branches/
+
+# Sistema / editor
+.DS_Store
+Thumbs.db
+.vscode/*
+!.vscode/extensions.json

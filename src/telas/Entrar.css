@@ -1,0 +1,6 @@
+.entrar { min-height: 100%; display: grid; place-items: center; padding: var(--esp-5); }
+.entrar form { width: min(100%, 340px); display: grid; gap: var(--esp-2); }
+.entrar h1 { margin-bottom: var(--esp-1); }
+.entrar p { margin: 0 0 var(--esp-4); }
+.entrar label { font-size: var(--tam-1); color: var(--cor-texto-suave); margin-top: var(--esp-2); }
+.entrar button { margin-top: var(--esp-4); }

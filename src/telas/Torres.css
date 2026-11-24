@@ -1,0 +1,19 @@
+.torres { display: grid; gap: var(--esp-4); min-width: 0; }
+.torres-cabeca { display: flex; gap: var(--esp-3); align-items: baseline; }
+
+.torres-filtros { display: flex; flex-wrap: wrap; gap: var(--esp-3); align-items: center; }
+.torres-filtros input[type="search"] { min-width: 220px; }
+
+.seg { display: inline-flex; }
+.seg button + button { border-left: 0; }
+
+button[aria-pressed="true"] { background: var(--cor-acento); color: var(--cor-fundo); border-color: var(--cor-acento); }
+
+.torres-tipos { display: flex; flex-wrap: wrap; gap: var(--esp-2); }
+.torres-tipos button { padding: var(--esp-1) var(--esp-3); }
+.torres-tipos .num { opacity: .7; margin-left: var(--esp-1); }
+.torres-tipos .limpar { border-style: dashed; }
+
+.torres-tabela { overflow: auto; max-height: calc(100vh - 260px); border-top: 1px solid var(--cor-linha); }
+.torres-tabela tbody tr:hover { background: var(--cor-superficie); }
+.torres-tabela .ref { text-decoration: underline; text-underline-offset: 3px; }
