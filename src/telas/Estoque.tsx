@@ -1,4 +1,4 @@
-import { useMemo, useState, type MouseEvent } from 'react';
+import { useEffect, useLayoutEffect, useMemo, useRef, useState, type MouseEvent } from 'react';
 import { useSearchParams } from 'react-router';
 import { Abas, Porcentagem, Titulo } from '../componentes/Titulo';
 import { useEscopo } from '../lib/escopo';
@@ -17,6 +17,55 @@ function useColunaSobMouse() {
     setCol(td && tr && !tr.classList.contains('faixa') && !tr.classList.contains('vols') && td.closest('table') === e.currentTarget ? td.cellIndex : null);
   };
   return { 'data-col': col ?? undefined, onMouseOver: sobre, onMouseLeave: () => setCol(null) };
+}
+
+// Seleção de células como no Excel: clique seleciona (fica marcada), Ctrl+clique soma/remove, Esc limpa.
+// A célula é identificada pela linha (data-k no <tr>) + índice da coluna; a marcação é aplicada após cada render.
+function useSelecao() {
+  const ref = useRef<HTMLTableElement>(null);
+  const [sel, setSel] = useState<Set<string>>(new Set());
+  const [resumo, setResumo] = useState<{ n: number; numeros: number; soma: number } | null>(null);
+  const chave = (td: HTMLTableCellElement) => `${(td.parentElement as HTMLElement).dataset.k}|${td.cellIndex}`;
+  const onClick = (e: MouseEvent<HTMLTableElement>) => {
+    if ((e.target as HTMLElement).closest('a, button, input')) return;
+    const td = (e.target as HTMLElement).closest('td');
+    if (!td || !(td.parentElement as HTMLElement)?.dataset.k) return;
+    const k = chave(td);
+    setSel((s) => {
+      if (e.ctrlKey || e.metaKey) { const x = new Set(s); if (x.has(k)) x.delete(k); else x.add(k); return x; }
+      return s.size === 1 && s.has(k) ? new Set() : new Set([k]);
+    });
+  };
+  useEffect(() => {
+    const esc = (e: KeyboardEvent) => { if (e.key === 'Escape') setSel(new Set()); };
+    window.addEventListener('keydown', esc);
+    return () => window.removeEventListener('keydown', esc);
+  }, []);
+  useLayoutEffect(() => {
+    const t = ref.current;
+    if (!t) return;
+    let numeros = 0, soma = 0;
+    t.querySelectorAll('td.selc').forEach((td) => td.classList.remove('selc'));
+    t.querySelectorAll<HTMLTableCellElement>('tbody tr[data-k] > td').forEach((td) => {
+      if (!sel.has(chave(td))) return;
+      td.classList.add('selc');
+      const txt = (td.textContent ?? '').trim();
+      if (/^-?[\d.]+(,\d+)?$/.test(txt)) { numeros += 1; soma += Number(txt.replace(/\./g, '').replace(',', '.')); }
+    });
+    const novo = sel.size > 1 ? { n: sel.size, numeros, soma } : null;
+    setResumo((r) => (JSON.stringify(r) === JSON.stringify(novo) ? r : novo));
+  });
+  return { ref, onClick, resumo };
+}
+
+function ResumoSelecao({ r }: { r: { n: number; numeros: number; soma: number } | null }) {
+  if (!r) return null;
+  return (
+    <span className="resumo-sel num">
+      {r.n} células{r.numeros > 1 && <> · soma <b>{r.soma.toLocaleString('pt-BR', { maximumFractionDigits: 3 })}</b></>}
+      <span className="muted"> · Esc limpa</span>
+    </span>
+  );
 }
 const n = (v: number | string | null | undefined) => Number(v ?? 0);
 
@@ -93,6 +142,7 @@ export function Volumes({ saldos, est, varios, tipos, soFalta, mudar }: {
   saldos: Saldo[]; est: EstoqueParte[]; varios: boolean; tipos: string[]; soFalta: boolean; mudar: (k: string, v: string) => void;
 }) {
   const cruz = useColunaSobMouse();
+  const selecao = useSelecao();
   const [parteSob, setParteSob] = useState<string | null>(null);  // conjunto completo sob o mouse
   const porParte = useMemo(() => new Map(est.map((x) => [`${x.linha}|${x.canteiro}|${x.tipo}|${x.parte}`, x])), [est]);
   const grupos = useMemo(() => {
@@ -128,9 +178,9 @@ export function Volumes({ saldos, est, varios, tipos, soFalta, mudar }: {
         </label>
       </div>
       <section className="panel estoque-painel">
-        <div className="tramo-h"><b>RECEBIMENTO POR VOLUME</b><span className="muted">{titulo.toUpperCase()}</span></div>
+        <div className="tramo-h"><b>RECEBIMENTO POR VOLUME</b><span className="muted">{titulo.toUpperCase()}</span><span className="grow" /><ResumoSelecao r={selecao.resumo} /></div>
         <div className="estoque-tabela">
-          <table className="est vr cruz" {...cruz}>
+          <table className="est vr cruz" {...cruz} ref={selecao.ref} onClick={selecao.onClick}>
             <thead>
               <tr>
                 <th rowSpan={2}>Parte - matriz</th><th rowSpan={2}>Parte</th>
@@ -167,7 +217,7 @@ export function Volumes({ saldos, est, varios, tipos, soFalta, mudar }: {
                     const conj = n(e?.conjunto);
                                     const dica = e?.torres ? `Atende ${e.atendidas} de ${e.torres} torres na sequência de ataque` + (e.proxima_torre ? ` · próxima: ${e.proxima_torre} (seq. ${e.proxima_seq ?? '—'})` : '') : '';
                     return vs.map((v, i) => (
-                      <tr key={v.material_id} className={`${i === 0 ? 'ini-parte' : ''} ${parteSob === `${g.chave}|${parte}` ? 'grupo-hl' : ''}`}>
+                      <tr key={v.material_id} data-k={v.material_id} className={`${i === 0 ? 'ini-parte' : ''} ${parteSob === `${g.chave}|${parte}` ? 'grupo-hl' : ''}`}>
                         <td className="esq">{v.descricao}</td>
                         <td className="esq parte">{parte}</td>
                         <td className="g0">{num(v.previsto)}</td><td>{num(v.peso_unit, 2)}</td><td>{num(n(v.previsto) * n(v.peso_unit), 2)}</td>
@@ -191,6 +241,7 @@ export function Volumes({ saldos, est, varios, tipos, soFalta, mudar }: {
 
 export function Fixadores({ fixadores, varios, soFalta, mudar }: { fixadores: Saldo[]; varios: boolean; soFalta: boolean; mudar: (k: string, v: string) => void }) {
   const cruz = useColunaSobMouse();
+  const selecao = useSelecao();
   const lista = fixadores
     .filter((f) => !soFalta || n(f.recebido) < n(f.previsto))
     .sort((a, b) => a.linha.localeCompare(b.linha) || a.canteiro.localeCompare(b.canteiro) || a.ordem - b.ordem);
@@ -204,9 +255,9 @@ export function Fixadores({ fixadores, varios, soFalta, mudar }: { fixadores: Sa
         </label>
       </div>
       <section className="panel estoque-painel">
-        <div className="tramo-h"><b>FIXADORES</b><span className="muted num">{lista.length} itens</span></div>
+        <div className="tramo-h"><b>FIXADORES</b><span className="muted num">{lista.length} itens</span><span className="grow" /><ResumoSelecao r={selecao.resumo} /></div>
         <div className="estoque-tabela">
-          <table className="est cruz" {...cruz}>
+          <table className="est cruz" {...cruz} ref={selecao.ref} onClick={selecao.onClick}>
             <thead><tr>
               <th className="esq">Seção</th><th className="esq">Fixador</th><th>Previsto</th><th>Recebido</th><th>Saldo</th><th>Atendido</th>
               {varios && <th className="g0">Canteiro</th>}
@@ -217,7 +268,7 @@ export function Fixadores({ fixadores, varios, soFalta, mudar }: { fixadores: Sa
                 const divisa = ant && (ant.secao !== f.secao || ant.canteiro !== f.canteiro || ant.linha !== f.linha);
                 const saldo = n(f.recebido) - n(f.previsto);
                 return (
-                  <tr key={`${f.linha_id}-${f.canteiro_id}-${f.material_id}`} className={divisa ? 'divisa' : ''}>
+                  <tr key={`${f.linha_id}-${f.canteiro_id}-${f.material_id}`} data-k={`${f.linha_id}-${f.canteiro_id}-${f.material_id}`} className={divisa ? 'divisa' : ''}>
                     <td className="esq muted secao">{!ant || divisa ? f.secao.replace(/^FIXADORES\s*-?\s*/i, '') || 'Granel' : ''}</td>
                     <td className="esq"><b>{f.descricao}</b></td>
                     <td>{num(f.previsto)}</td><td>{num(f.recebido)}</td>

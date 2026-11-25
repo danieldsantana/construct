@@ -91,3 +91,7 @@ table.cruz[data-col="8"] tbody tr:not(.faixa):hover > td:nth-child(9),
 table.cruz[data-col="9"] tbody tr:not(.faixa):hover > td:nth-child(10) { background-image: linear-gradient(rgba(0, 46, 109, .11), rgba(0, 46, 109, .11)); }
 /* mouse sobre o conjunto completo: todas as linhas daquela parte */
 table.cruz tbody tr.grupo-hl > td { background-image: linear-gradient(rgba(0, 46, 109, .045), rgba(0, 46, 109, .045)); }
+/* seleção de células (clique / Ctrl+clique), fica marcada como no Excel */
+table.est tbody td { cursor: cell; }
+table.est tbody td.selc { background-image: linear-gradient(rgba(0, 46, 109, .14), rgba(0, 46, 109, .14)) !important; box-shadow: inset 0 0 0 2px var(--navy-2) !important; }
+.resumo-sel { font-size: 12.5px; color: var(--navy); }
