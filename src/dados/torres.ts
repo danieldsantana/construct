@@ -76,3 +76,8 @@ export function formatarMetros(v: number | null) {
 
 // Linhas com o código usado nos documentos (T4 = JZTIII-CAFII, T3 = CAFII-BRRII)
 export const useLinhas = () => useTabela<{ sigla: string; codigo: string }>('linha', 'sigla, codigo', ['sigla']);
+
+// Pintura da LISTA calculada no banco: conjunto completo do estoque distribuído pela sequência de ataque.
+export type TorreComponente = { torre_id: number; chave: string; completo: boolean; necessidade: number; disponivel_antes: number };
+export const useTorreComponentes = () =>
+  useTabela<TorreComponente>('torre_componente', 'torre_id, chave, completo, necessidade, disponivel_antes', ['torre_id', 'chave']);

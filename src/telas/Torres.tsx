@@ -1,6 +1,6 @@
 import { useMemo } from 'react';
 import { useSearchParams } from 'react-router';
-import { COMPOSICAO, formatarMetros, statusDaTorre, useLinhas, useTorres, type ClasseStatus, type Torre } from '../dados/torres';
+import { COMPOSICAO, formatarMetros, statusDaTorre, useLinhas, useTorreComponentes, useTorres, type ClasseStatus, type Torre, type TorreComponente } from '../dados/torres';
 import { useEscopo } from '../lib/escopo';
 import { num } from '../lib/formato';
 import { Titulo } from '../componentes/Titulo';
@@ -14,6 +14,8 @@ export type Aba = 'lista' | 'mapa';
 // Nada é calculado aqui: o status é o do controle. Linha e canteiro vêm do escopo; o resto fica na URL.
 export function Torres({ aba }: { aba: Aba }) {
   const { torres, carregando, erro } = useTorres();
+  const pintura = useTorreComponentes();
+  const cores = useMemo(() => new Map(pintura.dados.map((p) => [`${p.torre_id}|${p.chave}`, p])), [pintura.dados]);
   const linhasCad = useLinhas();
   const { inclui } = useEscopo();
   const [params, setParams] = useSearchParams();
@@ -97,10 +99,10 @@ export function Torres({ aba }: { aba: Aba }) {
       )}
 
       {aba === 'lista'
-        ? <Lista torres={visiveis} completas={completas} ordem={ordem} selId={selId} abrir={(id) => mudar('torre', String(id))} escolherTramo={(t) => mudar('tramo', `${t.linha_sigla}-${t.tramo}`)} />
+        ? <Lista torres={visiveis} cores={cores} completas={completas} ordem={ordem} selId={selId} abrir={(id) => mudar('torre', String(id))} escolherTramo={(t) => mudar('tramo', `${t.linha_sigla}-${t.tramo}`)} />
         : <Mapa torres={visiveis} selId={selId} abrir={(id) => mudar('torre', String(id))} />}
 
-      <FichaTorre t={sel} aoFechar={() => mudar('torre', '')} />
+      <FichaTorre t={sel} cores={cores} aoFechar={() => mudar('torre', '')} />
     </div>
   );
 }
@@ -130,8 +132,8 @@ function valorComp(t: Torre, chave: string, metros?: boolean) {
 
 // Uma tabela só (como a aba LISTA), com todos os canteiros do escopo em sequência; na divisa entre canteiros, uma
 // linha levemente mais escura. Só mostra o grupo de composição (AUTOPORTANTE/ESTAIADA) que existe no recorte.
-export function Lista({ torres, completas, ordem, selId, abrir, escolherTramo }: {
-  torres: Torre[]; completas: Map<string, string>; ordem: 'torre' | 'seq'; selId: number | null; abrir: (id: number) => void; escolherTramo: (t: Torre) => void;
+export function Lista({ torres, cores, completas, ordem, selId, abrir, escolherTramo }: {
+  torres: Torre[]; cores: Map<string, TorreComponente>; completas: Map<string, string>; ordem: 'torre' | 'seq'; selId: number | null; abrir: (id: number) => void; escolherTramo: (t: Torre) => void;
 }) {
   const grupos = useMemo(() => {
     const m = new Map<string, Torre[]>();
@@ -179,7 +181,7 @@ export function Lista({ torres, completas, ordem, selId, abrir, escolherTramo }:
                   <button className="tramo" onClick={(e) => { e.stopPropagation(); escolherTramo(t); }} title="Ver só este tramo">{t.tramo}</button>
                 </td>
                 <td><Status t={t} /></td>
-                {comp.flatMap((g) => g.colunas.map((c, ci) => <td key={c.chave} className={`r num comp ${ci === 0 ? 'g0' : ''}`}>{valorComp(t, c.chave, c.metros)}</td>))}
+                {comp.flatMap((g) => g.colunas.map((c, ci) => <td key={c.chave} className={`r num comp ${ci === 0 ? 'g0' : ''} ${classeCor(cores.get(`${t.id}|${c.chave}`))}`}>{valorComp(t, c.chave, c.metros)}</td>))}
               </tr>
             )))}
           </tbody>
@@ -233,7 +235,7 @@ export function Mapa({ torres, selId, abrir }: { torres: Torre[]; selId: number 
   );
 }
 
-export function FichaTorre({ t, aoFechar }: { t: Torre | null; aoFechar: () => void }) {
+export function FichaTorre({ t, cores, aoFechar }: { t: Torre | null; cores: Map<string, TorreComponente>; aoFechar: () => void }) {
   const pernas = t ? [t.perna_a, t.perna_b, t.perna_c, t.perna_d] : [];
   const grupo = t ? COMPOSICAO.find((g) => g.grupo === (t.categoria === 'autoportante' ? 'AUTOPORTANTE' : 'ESTAIADA')) : undefined;
   return (
@@ -264,20 +266,24 @@ export function FichaTorre({ t, aoFechar }: { t: Torre | null; aoFechar: () => v
             </table>
           </section>
           <section>
-            <h3 className="dr-t">Composição na LISTA do controle</h3>
+            <h3 className="dr-t">Composição na LISTA do controle · pintura pelo estoque</h3>
             {t.composicao && grupo ? (
               <table>
-                <thead><tr><th>{grupo.grupo}</th><th className="r">Qtd. / m</th></tr></thead>
+                <thead><tr><th>{grupo.grupo}</th><th className="r">Qtd. / m</th><th>No estoque</th></tr></thead>
                 <tbody>
-                  {grupo.colunas.filter((c) => t.composicao?.[c.chave] !== undefined).map((c) => (
-                    <tr key={c.chave}><td>{c.rotulo}</td><td className="r num">{valorComp(t, c.chave, c.metros)}</td></tr>
-                  ))}
+                  {grupo.colunas.filter((c) => t.composicao?.[c.chave] !== undefined).map((c) => {
+                    const p = cores.get(`${t.id}|${c.chave}`);
+                    return (
+                      <tr key={c.chave}><td>{c.rotulo}</td><td className={`r num ${classeCor(p)}`}>{valorComp(t, c.chave, c.metros)}</td>
+                        <td>{p ? (p.completo ? 'completo' : <span className="warn">falta</span>) : '—'}</td></tr>
+                    );
+                  })}
                 </tbody>
               </table>
             ) : <p className="muted">Controle deste canteiro ainda não importado.</p>}
             {t.fonte && <p className="muted" style={{ fontSize: 12, margin: '6px 0 0' }}>Fonte: aba {abaDaFonte(t.fonte)} do controle</p>}
           </section>
-          <div className="callout">O que falta para esta torre (por volume) entra quando definirmos juntos as regras de situação.</div>
+          <p className="muted" style={{ fontSize: 12.5, margin: 0 }}>Verde = o conjunto completo em estoque chega até esta torre na sequência de ataque; vermelho = ainda não. Situações da torre (zerada, pré-montagem…) entram quando definirmos as regras.</p>
         </>
       )}
     </Gaveta>
@@ -287,4 +293,9 @@ export function FichaTorre({ t, aoFechar }: { t: Torre | null; aoFechar: () => v
 // 'controle:1 - Controle de estruturas - Juazeiro.xlsx · LISTA - JUAZEIRO' -> 'LISTA - JUAZEIRO' (sem o nome do arquivo)
 function abaDaFonte(fonte: string) {
   return fonte.split(' · ').pop() ?? fonte;
+}
+
+// Pintura da célula pelo estoque (verde = completo para a torre na sequência de ataque; vermelho = falta)
+function classeCor(p: TorreComponente | undefined) {
+  return p ? (p.completo ? 'pint-ok' : 'pint-falta') : '';
 }

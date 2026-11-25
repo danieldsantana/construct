@@ -52,3 +52,9 @@ main:has(> .torres.cheia) { overflow: hidden; padding-bottom: 12px; display: fle
 /* separação mais grossa entre a parte principal, AUTOPORTANTE e ESTAIADA */
 .torres-tabela table.lista td.g0 { border-left: 2px solid var(--line); }
 .torres-tabela table.lista th.g0, .torres-tabela table.lista th.grp { border-left: 2px solid rgba(255,255,255,.55); }
+
+/* pintura da LISTA (como no controle: verde completo, vermelho falta) */
+.torres-tabela table.lista td.pint-ok, .drawer td.pint-ok { background: #00b050; color: #fff; font-weight: 600; }
+.torres-tabela table.lista td.pint-falta, .drawer td.pint-falta { background: #ff0000; color: #fff; font-weight: 600; }
+.torres-tabela table.lista tbody tr:hover td.pint-ok { background: #00983f; }
+.torres-tabela table.lista tbody tr:hover td.pint-falta { background: #e00000; }
