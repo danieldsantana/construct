@@ -6,7 +6,9 @@ import { useCallback, useEffect, useLayoutEffect, useRef, type MouseEvent } from
 // Tudo é aplicado direto no DOM (sem estado do React): mover o mouse ou arrastar não redesenha a tabela.
 type Pos = { r: number; c: number };
 
-export function useTabelaCruz() {
+// Opções: cruz = destaque de linha/coluna (mouse e seleção); referencia = seletor das células da linha que acompanham a
+// seleção quando não há cruz (ex. Lista: 'td.tnum, td.tipo').
+export function useTabelaCruz({ cruz = true, referencia = '' }: { cruz?: boolean; referencia?: string } = {}) {
   const ref = useRef<HTMLTableElement>(null);
   const resumoRef = useRef<HTMLSpanElement>(null);
   const sel = useRef<Set<string>>(new Set());
@@ -24,7 +26,7 @@ export function useTabelaCruz() {
   const aplicar = useCallback(() => {
     const t = ref.current;
     if (!t) return;
-    t.querySelectorAll('td.selc, td.sel-lin, td.sel-col').forEach((td) => td.classList.remove('selc', 'sel-lin', 'sel-col'));
+    t.querySelectorAll('td.selc, td.sel-lin, td.sel-col, td.sel-ref').forEach((td) => td.classList.remove('selc', 'sel-lin', 'sel-col', 'sel-ref'));
     const s = sel.current;
     let numeros = 0, soma = 0;
     if (s.size) {
@@ -38,9 +40,10 @@ export function useTabelaCruz() {
           const txt = (td.textContent ?? '').trim();
           if (/^-?[\d.]+(,\d+)?$/.test(txt)) { numeros += 1; soma += Number(txt.replace(/\./g, '').replace(',', '.')); }
         }
-        if (marcada) for (const td of tr.cells) td.classList.add('sel-lin');
+        if (marcada && cruz) for (const td of tr.cells) td.classList.add('sel-lin');
+        if (marcada && referencia) tr.querySelectorAll(referencia).forEach((td) => td.classList.add('sel-ref'));
       }
-      for (const tr of ls) for (const td of tr.cells) if (cols.has(td.cellIndex)) td.classList.add('sel-col');
+      if (cruz) for (const tr of ls) for (const td of tr.cells) if (cols.has(td.cellIndex)) td.classList.add('sel-col');
     }
     const r = resumoRef.current;
     if (r) {
@@ -48,6 +51,7 @@ export function useTabelaCruz() {
         ? `${s.size} células${numeros > 1 ? ` · soma ${soma.toLocaleString('pt-BR', { maximumFractionDigits: 3 })}` : ''} · Esc limpa`
         : '';
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const retangulo = (a: Pos, b: Pos) => {
@@ -77,7 +81,7 @@ export function useTabelaCruz() {
     const td = (e.target as HTMLElement).closest('td') as HTMLTableCellElement | null;
     const tr = td?.parentElement as HTMLTableRowElement | undefined;
     // coluna sob o mouse: atributo na tabela (o CSS pinta a coluna), sem redesenhar
-    const col = td && tr?.dataset.k && td.closest('table') === t ? String(td.cellIndex) : '';
+    const col = cruz && td && tr?.dataset.k && td.closest('table') === t ? String(td.cellIndex) : '';
     if (t.dataset.col !== col) { if (col) t.dataset.col = col; else delete t.dataset.col; }
     const a = arraste.current;
     if (!a || !(e.buttons & 1) || !td || !tr?.dataset.k) return;

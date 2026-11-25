@@ -286,3 +286,10 @@ table.cruz tbody td.sel-lin, table.cruz tbody td.sel-col { background-image: lin
 table.cruz tbody td.selc { background-image: linear-gradient(rgba(0, 46, 109, .055), rgba(0, 46, 109, .055)) !important; }
 table.cruz { user-select: none; }
 .resumo-sel { font-size: 12.5px; color: var(--navy); }
+
+/* tabela só com seleção (sem a cruz do mouse): célula selecionada + células de referência da linha (ex. Lista) */
+table.selecionavel { user-select: none; }
+table.selecionavel tbody td { cursor: cell; }
+table.selecionavel tbody td.selc { background-image: linear-gradient(rgba(0, 46, 109, .055), rgba(0, 46, 109, .055)) !important; }
+table.selecionavel tbody td.sel-ref { background-image: linear-gradient(rgba(0, 46, 109, .055), rgba(0, 46, 109, .055)); }
+table.selecionavel tbody td.tnum.sel-ref { background-image: linear-gradient(rgba(255, 255, 255, .16), rgba(255, 255, 255, .16)); }
