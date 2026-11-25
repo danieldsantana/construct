@@ -1,101 +1,109 @@
-import { useEffect, useLayoutEffect, useRef, useState, type MouseEvent } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useRef, type MouseEvent } from 'react';
 
 // Tabelas com destaque em cruz (mouse) e seleção de células como no Excel — usado no Estoque e na Lista.
-// Na tabela: className "cruz", {...useColunaSobMouse()}, ref/onMouseDown/onMouseOver de useSelecao(); linhas com data-k.
-
-// Destaque em cruz: a linha sob o mouse (CSS :hover) e a coluna (índice da célula, via data-col na tabela).
-export function useColunaSobMouse() {
-  const [col, setCol] = useState<number | null>(null);
-  const sobre = (e: MouseEvent<HTMLTableElement>) => {
-    const td = (e.target as HTMLElement).closest('td');
-    const tr = td?.parentElement;
-    setCol(td && tr && !tr.classList.contains('faixa') && !tr.classList.contains('vols') && td.closest('table') === e.currentTarget ? td.cellIndex : null);
-  };
-  return { 'data-col': col ?? undefined, onMouseOver: sobre, onMouseLeave: () => setCol(null) };
-}
-
-// Seleção de células como no Excel: clique seleciona, arrastar seleciona o retângulo, Ctrl soma áreas/células,
-// Esc limpa. A célula é identificada pela linha (data-k no <tr>) + índice da coluna; a marcação (célula + sombra leve
-// na linha e na coluna, como o destaque do mouse) é aplicada no DOM após cada render.
+// Uso: <table className="cruz" ref={s.ref} onMouseDown={s.onMouseDown} onMouseOver={s.onMouseOver} onMouseLeave={s.onMouseLeave}>,
+// linhas do tbody com data-k (identificador da linha) e <ResumoSelecao refSpan={s.resumoRef} /> onde mostrar a soma.
+// Tudo é aplicado direto no DOM (sem estado do React): mover o mouse ou arrastar não redesenha a tabela.
 type Pos = { r: number; c: number };
-export function useSelecao({ multipla = true }: { multipla?: boolean } = {}) {
+
+export function useTabelaCruz() {
   const ref = useRef<HTMLTableElement>(null);
-  const [sel, setSel] = useState<Set<string>>(new Set());
-  const [resumo, setResumo] = useState<{ n: number; numeros: number; soma: number } | null>(null);
-  const arraste = useRef<{ ini: Pos; base: Set<string> } | null>(null);
-  const linhas = () => [...(ref.current?.querySelectorAll<HTMLTableRowElement>('tbody tr[data-k]') ?? [])];
+  const resumoRef = useRef<HTMLSpanElement>(null);
+  const sel = useRef<Set<string>>(new Set());
+  const arraste = useRef<{ ini: Pos; base: Set<string>; ultimo: string } | null>(null);
+
+  const linhas = () => [...(ref.current?.querySelectorAll<HTMLTableRowElement>(':scope > tbody > tr[data-k]') ?? [])];
   const chave = (td: HTMLTableCellElement) => `${(td.parentElement as HTMLElement).dataset.k}|${td.cellIndex}`;
-  const posDe = (alvo: EventTarget): { td: HTMLTableCellElement; p: Pos } | null => {
+  const celula = (alvo: EventTarget) => {
     const td = (alvo as HTMLElement).closest('td') as HTMLTableCellElement | null;
     const tr = td?.parentElement as HTMLTableRowElement | undefined;
-    if (!td || !tr?.dataset.k || td.closest('table') !== ref.current) return null;
-    return { td, p: { r: linhas().indexOf(tr), c: td.cellIndex } };
+    return td && tr?.dataset.k && td.closest('table') === ref.current ? td : null;
   };
+
+  // marca as células selecionadas (+ sombra leve na linha e na coluna) e escreve contagem/soma
+  const aplicar = useCallback(() => {
+    const t = ref.current;
+    if (!t) return;
+    t.querySelectorAll('td.selc, td.sel-lin, td.sel-col').forEach((td) => td.classList.remove('selc', 'sel-lin', 'sel-col'));
+    const s = sel.current;
+    let numeros = 0, soma = 0;
+    if (s.size) {
+      const cols = new Set<number>();
+      const ls = linhas();
+      for (const tr of ls) {
+        let marcada = false;
+        for (const td of tr.cells) {
+          if (!s.has(chave(td))) continue;
+          marcada = true; cols.add(td.cellIndex); td.classList.add('selc');
+          const txt = (td.textContent ?? '').trim();
+          if (/^-?[\d.]+(,\d+)?$/.test(txt)) { numeros += 1; soma += Number(txt.replace(/\./g, '').replace(',', '.')); }
+        }
+        if (marcada) for (const td of tr.cells) td.classList.add('sel-lin');
+      }
+      for (const tr of ls) for (const td of tr.cells) if (cols.has(td.cellIndex)) td.classList.add('sel-col');
+    }
+    const r = resumoRef.current;
+    if (r) {
+      r.textContent = s.size > 1
+        ? `${s.size} células${numeros > 1 ? ` · soma ${soma.toLocaleString('pt-BR', { maximumFractionDigits: 3 })}` : ''} · Esc limpa`
+        : '';
+    }
+  }, []);
+
   const retangulo = (a: Pos, b: Pos) => {
     const ls = linhas(), out = new Set<string>();
     for (let r = Math.min(a.r, b.r); r <= Math.max(a.r, b.r); r++)
       for (const td of ls[r]?.cells ?? []) if (td.cellIndex >= Math.min(a.c, b.c) && td.cellIndex <= Math.max(a.c, b.c)) out.add(chave(td));
     return out;
   };
+
   const onMouseDown = (e: MouseEvent<HTMLTableElement>) => {
-    if (e.button !== 0 || (e.target as HTMLElement).closest('a, button, input')) return;
-    const x = posDe(e.target);
-    if (!x) return;
+    if (e.button !== 0 || e.detail > 1 || (e.target as HTMLElement).closest('a, button, input')) return;
+    const td = celula(e.target);
+    if (!td) return;
     e.preventDefault();  // não seleciona texto ao arrastar
-    const k = chave(x.td);
-    const ctrl = multipla && (e.ctrlKey || e.metaKey);  // sem seleção múltipla: Ctrl é ignorado
-    if (ctrl && sel.has(k)) {  // Ctrl+clique numa célula marcada: desmarca
-      const s2 = new Set(sel); s2.delete(k); setSel(s2); arraste.current = null; return;
-    }
-    if (!ctrl && sel.size === 1 && sel.has(k)) { setSel(new Set()); arraste.current = null; return; }
-    const base = ctrl ? new Set(sel) : new Set<string>();
-    arraste.current = multipla ? { ini: x.p, base } : null;  // arrastar só com seleção múltipla
-    setSel(new Set([...base, k]));
+    const k = chave(td);
+    const ctrl = e.ctrlKey || e.metaKey;
+    if (ctrl && sel.current.has(k)) { sel.current.delete(k); arraste.current = null; aplicar(); return; }
+    if (!ctrl && sel.current.size === 1 && sel.current.has(k)) { sel.current = new Set(); arraste.current = null; aplicar(); return; }
+    const base = ctrl ? new Set(sel.current) : new Set<string>();
+    arraste.current = { ini: { r: linhas().indexOf(td.parentElement as HTMLTableRowElement), c: td.cellIndex }, base, ultimo: k };
+    sel.current = new Set([...base, k]);
+    aplicar();
   };
+
   const onMouseOver = (e: MouseEvent<HTMLTableElement>) => {
+    const t = e.currentTarget;
+    const td = (e.target as HTMLElement).closest('td') as HTMLTableCellElement | null;
+    const tr = td?.parentElement as HTMLTableRowElement | undefined;
+    // coluna sob o mouse: atributo na tabela (o CSS pinta a coluna), sem redesenhar
+    const col = td && tr?.dataset.k && td.closest('table') === t ? String(td.cellIndex) : '';
+    if (t.dataset.col !== col) { if (col) t.dataset.col = col; else delete t.dataset.col; }
     const a = arraste.current;
-    if (!a || !(e.buttons & 1)) return;
-    const x = posDe(e.target);
-    if (x) setSel(new Set([...a.base, ...retangulo(a.ini, x.p)]));
+    if (!a || !(e.buttons & 1) || !td || !tr?.dataset.k) return;
+    const k = chave(td);
+    if (k === a.ultimo) return;
+    a.ultimo = k;
+    sel.current = new Set([...a.base, ...retangulo(a.ini, { r: linhas().indexOf(tr), c: td.cellIndex })]);
+    aplicar();
   };
+
+  const onMouseLeave = (e: MouseEvent<HTMLTableElement>) => { delete e.currentTarget.dataset.col; };
+
   useEffect(() => {
     const fim = () => { arraste.current = null; };
-    const esc = (e: KeyboardEvent) => { if (e.key === 'Escape') setSel(new Set()); };
+    const esc = (e: KeyboardEvent) => { if (e.key === 'Escape' && sel.current.size) { sel.current = new Set(); aplicar(); } };
     window.addEventListener('mouseup', fim);
     window.addEventListener('keydown', esc);
     return () => { window.removeEventListener('mouseup', fim); window.removeEventListener('keydown', esc); };
-  }, []);
-  useLayoutEffect(() => {
-    const t = ref.current;
-    if (!t) return;
-    t.querySelectorAll('td.selc, td.sel-lin, td.sel-col').forEach((td) => td.classList.remove('selc', 'sel-lin', 'sel-col'));
-    let numeros = 0, soma = 0;
-    const cols = new Set<number>();
-    const ls = linhas();
-    for (const tr of ls) {
-      let linhaSel = false;
-      for (const td of tr.cells) {
-        if (!sel.has(chave(td))) continue;
-        linhaSel = true; cols.add(td.cellIndex); td.classList.add('selc');
-        const txt = (td.textContent ?? '').trim();
-        if (/^-?[\d.]+(,\d+)?$/.test(txt)) { numeros += 1; soma += Number(txt.replace(/\./g, '').replace(',', '.')); }
-      }
-      if (linhaSel) for (const td of tr.cells) td.classList.add('sel-lin');
-    }
-    if (cols.size) for (const tr of ls) for (const td of tr.cells) if (cols.has(td.cellIndex)) td.classList.add('sel-col');
-    const novo = sel.size > 1 ? { n: sel.size, numeros, soma } : null;
-    setResumo((r) => (JSON.stringify(r) === JSON.stringify(novo) ? r : novo));
-  });
-  return { ref, onMouseDown, onMouseOver, resumo };
+  }, [aplicar]);
+
+  // depois de cada render (filtro, ordem…), reaplica a marcação nas células que ainda existem
+  useLayoutEffect(() => { aplicar(); });
+
+  return { ref, resumoRef, onMouseDown, onMouseOver, onMouseLeave };
 }
 
-export function ResumoSelecao({ r }: { r: { n: number; numeros: number; soma: number } | null }) {
-  if (!r) return null;
-  return (
-    <span className="resumo-sel num">
-      {r.n} células{r.numeros > 1 && <> · soma <b>{r.soma.toLocaleString('pt-BR', { maximumFractionDigits: 3 })}</b></>}
-      <span className="muted"> · Esc limpa</span>
-    </span>
-  );
+export function ResumoSelecao({ refSpan }: { refSpan: React.RefObject<HTMLSpanElement | null> }) {
+  return <span ref={refSpan} className="resumo-sel num" />;
 }
-

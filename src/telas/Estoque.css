@@ -21,24 +21,24 @@ table.est .pct { justify-content: center; }
 table.est .ok { color: #17663a; font-weight: 600; }
 
 table.est tr.parte { cursor: pointer; }
-table.est tr.parte:hover > td { background: var(--navy-tint); }
+table.est tr.parte:hover > td { background-color: var(--navy-tint); }
 table.est tr.parte .seta { display: inline-block; width: 14px; color: var(--muted); font-size: 11px; }
 table.est tr.parte .vol { margin-left: 8px; font-size: 11.5px; }
-table.est tr.parte.aberta > td { background: #f3f6fb; }
+table.est tr.parte.aberta > td { background-color: #f3f6fb; }
 
 /* volumes da parte (ao abrir) */
-table.est tr.vols > td { padding: 4px 8px 10px 30px; background: #fafbfc; }
+table.est tr.vols > td { padding: 4px 8px 10px 30px; background-color: #fafbfc; }
 table.est-vol { width: auto; min-width: 640px; }
 table.est-vol th { position: static; background: var(--navy-2); font-size: 11px; text-transform: none; padding: 3px 8px; }
-table.est-vol td { padding: 2px 8px; font-size: 12.5px; text-align: center; background: var(--panel); }
+table.est-vol td { padding: 2px 8px; font-size: 12.5px; text-align: center; background-color: var(--panel); }
 table.est-vol .esq { text-align: left; }
 
 /* mesmas cores da Lista */
-table.est td.pint-ok { background: #bfe6cb; color: #0f5a2c; font-weight: 600; }
-table.est td.pint-falta { background: #f6c4bf; color: #8f1d15; font-weight: 600; }
-table.est td.vazio { background: #fbfbfc; border-color: #f3f4f6; }
-table.est tr.parte:hover > td.pint-ok { background: #a9dcb9; }
-table.est tr.parte:hover > td.pint-falta { background: #efaea7; }
+table.est td.pint-ok { background-color: #bfe6cb; color: #0f5a2c; font-weight: 600; }
+table.est td.pint-falta { background-color: #f6c4bf; color: #8f1d15; font-weight: 600; }
+table.est td.vazio { background-color: #fbfbfc; border-color: #f3f4f6; }
+table.est tr.parte:hover > td.pint-ok { background-color: #a9dcb9; }
+table.est tr.parte:hover > td.pint-falta { background-color: #efaea7; }
 
 @media (max-width: 800px) {
   main:has(> .estoque.cheia) { overflow: auto; display: block; }
@@ -48,7 +48,7 @@ table.est tr.parte:hover > td.pint-falta { background: #efaea7; }
 /* VOLUMES RECEBIDOS (layout do controle, visual leve) */
 table.est.vr thead tr.sub th { top: 27px; font-size: 11px; }
 table.est.vr td { padding: 3px 8px; font-size: 12.5px; }
-table.est.vr tr.faixa td { background: #e8eef7; border-color: #d5dfec; padding: 5px 10px; }
+table.est.vr tr.faixa td { background-color: #e8eef7; border-color: #d5dfec; padding: 5px 10px; }
 .faixa-c { display: flex; align-items: baseline; gap: 16px; color: var(--navy); font-size: 12.5px; }
 .faixa-c b { font-weight: 700; }
 .faixa-c .grow { flex: 1; }
@@ -57,9 +57,9 @@ table.est.vr tr.faixa td { background: #e8eef7; border-color: #d5dfec; padding: 
 table.est.vr td.parte { color: var(--muted); font-size: 12px; }
 /* divisa entre partes (componentes), um pouco mais escura que a grade, como no controle */
 table.est.vr tr.ini-parte > td { box-shadow: inset 0 1px 0 #c3cad4; }  /* sombra: a borda colapsada da linha de cima venceria */
-table.est.vr td.conj { font-size: 15px; font-weight: 700; vertical-align: middle; background: #f6f8fb; color: var(--navy); }
-table.est.vr td.rec-ok { background: #eaf6ee; }
-table.est.vr td.rec-parc { background: #fdf6e3; }
+table.est.vr td.conj { font-size: 15px; font-weight: 700; vertical-align: middle; background-color: #f6f8fb; color: var(--navy); }
+table.est.vr td.rec-ok { background-color: #eaf6ee; }
+table.est.vr td.rec-parc { background-color: #fdf6e3; }
 
 /* cabeçalho: títulos centralizados e linhas separando grupos e subtítulos (box-shadow: borda some em th fixo) */
 table.est thead th { text-align: center !important; box-shadow: inset -1px 0 0 rgba(255,255,255,.22), inset 0 -1px 0 rgba(255,255,255,.35); }

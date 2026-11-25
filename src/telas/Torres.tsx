@@ -4,7 +4,7 @@ import { COMPOSICAO, formatarMetros, statusDaTorre, useLinhas, useStatusAuto, us
 import { useEscopo } from '../lib/escopo';
 import { num } from '../lib/formato';
 import { Titulo } from '../componentes/Titulo';
-import { useColunaSobMouse, useSelecao } from '../componentes/TabelaCruz';
+import { ResumoSelecao, useTabelaCruz } from '../componentes/TabelaCruz';
 import { Gaveta } from '../componentes/Gaveta';
 import './Torres.css';
 
@@ -167,8 +167,7 @@ export function Lista({ torres, cores, completas, ordem, selId, abrir, escolherT
     if (ordem === 'seq') for (const g of m.values()) g.sort((a, b) => (a.sequencia ?? 1e9) - (b.sequencia ?? 1e9) || a.ordem - b.ordem);
     return [...m];
   }, [torres, ordem]);
-  const cruz = useColunaSobMouse();
-  const selecao = useSelecao({ multipla: false });  // na Lista: só uma célula (sem arrastar/Ctrl)
+  const cruz = useTabelaCruz();  // seleção múltipla (clique, arrastar, Ctrl); a ficha abre com duplo clique
   if (!torres.length) return <p className="muted">Nenhuma torre neste recorte.</p>;
   const comp = COMPOSICAO.filter((g) => torres.some((t) => t.categoria === (g.grupo === 'AUTOPORTANTE' ? 'autoportante' : 'estaiada')));
   const varios = grupos.length > 1;
@@ -184,10 +183,11 @@ export function Lista({ torres, cores, completas, ordem, selId, abrir, escolherT
         <b>{titulo.toUpperCase()}</b>
         <span className="muted num">{torres.length} torres</span>
         <span className="grow" />
+        <ResumoSelecao refSpan={cruz.resumoRef} />
         {abas.length > 0 && <span className="muted" style={{ fontSize: 12 }}>{abas.join(' · ')}</span>}
       </div>
       <div className="torres-tabela">
-        <table className="lista cruz" {...cruz} ref={selecao.ref} onMouseDown={selecao.onMouseDown} onMouseOver={(e) => { cruz.onMouseOver(e); selecao.onMouseOver(e); }}>
+        <table className="lista cruz" ref={cruz.ref} onMouseDown={cruz.onMouseDown} onMouseOver={cruz.onMouseOver} onMouseLeave={cruz.onMouseLeave}>
           <thead>
             <tr>
               <th rowSpan={2} className="r">Seq.</th><th rowSpan={2}>Torre</th><th rowSpan={2}>Tipo</th>
