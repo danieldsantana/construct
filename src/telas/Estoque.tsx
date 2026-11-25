@@ -1,4 +1,4 @@
-import { Fragment, useMemo, useState } from 'react';
+import { useMemo } from 'react';
 import { Link, useSearchParams } from 'react-router';
 import { Abas, Porcentagem, Titulo } from '../componentes/Titulo';
 import { useEscopo } from '../lib/escopo';
@@ -9,7 +9,7 @@ import './Estoque.css';
 type Aba = 'volumes' | 'fixadores';
 const n = (v: number | string | null | undefined) => Number(v ?? 0);
 
-// Estoque = VOLUMES RECEBIDOS (uma linha por parte, volumes ao abrir) e fixadores, só do que tem previsto no escopo.
+// Estoque = VOLUMES RECEBIDOS (layout do controle) e fixadores, só do que tem previsto no escopo.
 // O conjunto completo é o do estoque — o mesmo que pinta a Lista — e mostra até onde chega na sequência de ataque.
 export function Estoque() {
   const { inclui } = useEscopo();
@@ -45,55 +45,39 @@ export function Estoque() {
   );
 }
 
-type Parte = {
-  chave: string; linha: string; canteiro: string; tipo: string; parte: string; ordem: number;
-  volumes: Saldo[]; ep: EstoqueParte | undefined; previsto: number; conjunto: number; pesoPrev: number; pesoRec: number;
-};
+// VOLUMES RECEBIDOS como no controle: por tipo, faixa "ESTRUTURA METÁLICA <tipo>" com os pesos; uma linha por volume
+// (TORRE | PARTE - MATRIZ | PARTE | PREVISTO quant./peso unit./peso total | RECEBIDO quant./peso | CONJUNTO COMPLETO).
+// Conjunto completo = o do estoque (o mesmo que pinta a Lista), mesclado por parte.
+type Grupo = { chave: string; linha: string; canteiro: string; tipo: string; volumes: Saldo[] };
 
 export function Volumes({ saldos, est, varios, tipos, soFalta, mudar }: {
   saldos: Saldo[]; est: EstoqueParte[]; varios: boolean; tipos: string[]; soFalta: boolean; mudar: (k: string, v: string) => void;
 }) {
-  const [abertas, setAbertas] = useState<Set<string>>(new Set());
-  const partes = useMemo(() => {
-    const porParte = new Map(est.map((x) => [`${x.linha}|${x.canteiro}|${x.tipo}|${x.parte}`, x]));
-    const m = new Map<string, Parte>();
+  const porParte = useMemo(() => new Map(est.map((x) => [`${x.linha}|${x.canteiro}|${x.tipo}|${x.parte}`, x])), [est]);
+  const grupos = useMemo(() => {
+    const m = new Map<string, Grupo>();
     for (const s of saldos) {
       const tipo = s.tipo ?? '—';
-      const chave = `${s.linha}|${s.canteiro}|${tipo}|${s.parte}`;
-      const p = m.get(chave) ?? { chave, linha: s.linha, canteiro: s.canteiro, tipo, parte: s.parte!, ordem: s.ordem, volumes: [], ep: porParte.get(chave),
-        previsto: 0, conjunto: 0, pesoPrev: 0, pesoRec: 0 };
-      p.volumes.push(s);
-      p.ordem = Math.min(p.ordem, s.ordem);
-      p.pesoPrev += n(s.previsto) * n(s.peso_unit);
-      p.pesoRec += n(s.recebido) * n(s.peso_unit);
-      m.set(chave, p);
+      const chave = `${s.linha}|${s.canteiro}|${tipo}`;
+      const g = m.get(chave) ?? { chave, linha: s.linha, canteiro: s.canteiro, tipo, volumes: [] };
+      g.volumes.push(s);
+      m.set(chave, g);
     }
-    for (const p of m.values()) {
-      p.volumes.sort((a, b) => a.ordem - b.ordem);
-      p.previsto = n(p.ep?.previsto ?? Math.min(...p.volumes.map((v) => n(v.previsto))));
-      p.conjunto = n(p.ep?.conjunto);
-    }
-    return [...m.values()].sort((a, b) => a.linha.localeCompare(b.linha) || a.canteiro.localeCompare(b.canteiro) || a.tipo.localeCompare(b.tipo) || a.ordem - b.ordem);
-  }, [saldos, est]);
-
-  const contagem = useMemo(() => {
-    const c = new Map<string, number>();
-    for (const p of partes) c.set(p.tipo, (c.get(p.tipo) ?? 0) + 1);
-    return [...c];
-  }, [partes]);
-  const visiveis = partes.filter((p) => (!tipos.length || tipos.includes(p.tipo)) && (!soFalta || p.conjunto < p.previsto));
-  const alternar = (k: string) => setAbertas((s) => { const x = new Set(s); if (x.has(k)) x.delete(k); else x.add(k); return x; });
-  const pesoPrev = visiveis.reduce((s, p) => s + p.pesoPrev, 0);
-  const pesoRec = visiveis.reduce((s, p) => s + p.pesoRec, 0);
-  const colunas = 9 + (varios ? 1 : 0);
+    for (const g of m.values()) g.volumes.sort((a, b) => a.ordem - b.ordem);
+    return [...m.values()].sort((a, b) => a.linha.localeCompare(b.linha) || a.canteiro.localeCompare(b.canteiro) || a.volumes[0].ordem - b.volumes[0].ordem);
+  }, [saldos]);
+  const contagem = useMemo(() => [...new Set(grupos.map((g) => g.tipo))], [grupos]);
+  const cc = (g: Grupo, parte: string) => porParte.get(`${g.linha}|${g.canteiro}|${g.tipo}|${parte}`);
+  const visiveis = grupos.filter((g) => !tipos.length || tipos.includes(g.tipo));
+  const titulo = [...new Set(visiveis.map((g) => `${g.linha} · ${g.canteiro}`))].join(' + ');
 
   return (
     <>
       <div className="toolbar">
         <div className="chips" role="group" aria-label="Tipos de torre">
-          {contagem.map(([t, q]) => (
+          {contagem.map((t) => (
             <button key={t} className={`chip ${tipos.includes(t) ? 'on' : ''}`}
-                    onClick={() => mudar('tipos', (tipos.includes(t) ? tipos.filter((x) => x !== t) : [...tipos, t]).join(','))}>{t}<span className="n">{q}</span></button>
+                    onClick={() => mudar('tipos', (tipos.includes(t) ? tipos.filter((x) => x !== t) : [...tipos, t]).join(','))}>{t}</button>
           ))}
           {tipos.length > 0 && <button className="chip limpar" onClick={() => mudar('tipos', '')}>Limpar tipos</button>}
         </div>
@@ -101,66 +85,59 @@ export function Volumes({ saldos, est, varios, tipos, soFalta, mudar }: {
         <label className="muted" style={{ fontSize: 13, display: 'flex', gap: 6, alignItems: 'center' }}>
           <input type="checkbox" checked={soFalta} onChange={(e) => mudar('falta', e.target.checked ? '1' : '')} /> Só partes incompletas
         </label>
-        <button className="chip" onClick={() => setAbertas(abertas.size ? new Set() : new Set(visiveis.map((p) => p.chave)))}>
-          {abertas.size ? 'Recolher volumes' : 'Abrir todos os volumes'}
-        </button>
       </div>
       <section className="panel estoque-painel">
-        <div className="tramo-h">
-          <b>VOLUMES RECEBIDOS</b>
-          <span className="muted num">{visiveis.length} partes · peso previsto {num(pesoPrev / 1000, 1)} t · recebido {num(pesoRec / 1000, 1)} t</span>
-          <span className="grow" /><Porcentagem valor={pesoPrev ? pesoRec / pesoPrev : 0} />
-        </div>
+        <div className="tramo-h"><b>RECEBIMENTO POR VOLUME</b><span className="muted">{titulo.toUpperCase()}</span></div>
         <div className="estoque-tabela">
-          <table className="est">
-            <thead><tr>
-              <th>Tipo</th><th className="esq">Parte</th><th>Previsto</th><th>Conjunto completo</th><th>Atendimento</th>
-              <th className="g0">Torres atendidas</th><th>Próxima torre</th>
-              <th className="g0">Peso previsto (t)</th><th>Peso recebido (t)</th>{varios && <th className="g0">Canteiro</th>}
-            </tr></thead>
+          <table className="est vr">
+            <thead>
+              <tr>
+                <th rowSpan={2}>Torre</th><th rowSpan={2} className="esq">Parte - matriz</th><th rowSpan={2} className="esq">Parte</th>
+                <th colSpan={3} className="g0">Previsto</th><th colSpan={2} className="g0">Recebido</th><th rowSpan={2} className="g0">Conjunto completo</th>
+              </tr>
+              <tr className="sub"><th className="g0">Quant.</th><th>Peso unit.</th><th>Peso total</th><th className="g0">Quant.</th><th>Peso</th></tr>
+            </thead>
             <tbody>
-              {visiveis.map((p, i) => {
-                const ant = visiveis[i - 1];
-                const divisa = ant && (ant.tipo !== p.tipo || ant.canteiro !== p.canteiro || ant.linha !== p.linha);
-                const aberta = abertas.has(p.chave);
-                const completo = p.conjunto >= p.previsto;
-                return (
-                  <Fragment key={p.chave}>
-                    <tr className={`parte ${divisa ? 'divisa' : ''} ${aberta ? 'aberta' : ''}`} onClick={() => alternar(p.chave)}>
-                      <td className="tipo">{p.tipo}</td>
-                      <td className="esq"><span className="seta">{aberta ? '▾' : '▸'}</span>{p.parte}<span className="muted vol">{p.volumes.length} vol.</span></td>
-                      <td>{num(p.previsto)}</td>
-                      <td className={completo ? 'pint-ok' : p.conjunto === 0 ? 'pint-falta' : ''}><b>{num(p.conjunto)}</b></td>
-                      <td><Porcentagem valor={p.previsto ? p.conjunto / p.previsto : 0} ok={completo} /></td>
-                      <td className="g0">{p.ep?.torres ? <>{p.ep.atendidas} <span className="muted">de {p.ep.torres}</span></> : '—'}</td>
-                      <td onClick={(e) => e.stopPropagation()}>
-                        {p.ep?.proxima_torre
-                          ? <Link to={`/lista?q=${encodeURIComponent(p.ep.proxima_torre)}`} title={`Ver na Lista · seq. ${p.ep.proxima_seq ?? '—'}`}>{p.ep.proxima_torre}</Link>
-                          : p.ep?.torres ? <span className="ok">todas</span> : '—'}
-                      </td>
-                      <td className="g0">{num(p.pesoPrev / 1000, 2)}</td>
-                      <td>{num(p.pesoRec / 1000, 2)}</td>
-                      {varios && <td className="g0 cant">{p.linha} · {p.canteiro}</td>}
-                    </tr>
-                    {aberta && (
-                      <tr className="vols"><td colSpan={colunas}>
-                        <table className="est-vol">
-                          <thead><tr><th className="esq">Volume</th><th>Previsto</th><th>Recebido</th><th>Falta</th><th>Peso unit. (kg)</th><th>Peso recebido (kg)</th></tr></thead>
-                          <tbody>{p.volumes.map((v) => {
-                            const falta = Math.max(0, n(v.previsto) - n(v.recebido));
-                            return (
-                              <tr key={v.material_id}>
-                                <td className="esq">{v.descricao}</td><td>{num(v.previsto)}</td><td>{num(v.recebido)}</td>
-                                <td className={falta ? 'pint-falta' : 'vazio'}>{falta ? num(falta) : ''}</td>
-                                <td>{num(v.peso_unit, 3)}</td><td>{num(n(v.recebido) * n(v.peso_unit), 1)}</td>
-                              </tr>
-                            );
-                          })}</tbody>
-                        </table>
-                      </td></tr>
-                    )}
-                  </Fragment>
-                );
+              {visiveis.flatMap((g) => {
+                // partes na ordem do controle; com "só incompletas", some a parte cujo conjunto já cobre o previsto
+                const partes: [string, Saldo[]][] = [];
+                for (const v of g.volumes) {
+                  const ult = partes[partes.length - 1];
+                  if (ult && ult[0] === v.parte) ult[1].push(v); else partes.push([v.parte!, [v]]);
+                }
+                const mostrar = partes.filter(([parte, vs]) => !soFalta || n(cc(g, parte)?.conjunto) < n(cc(g, parte)?.previsto ?? vs[0].previsto));
+                if (!mostrar.length) return [];
+                const pesoPrev = g.volumes.reduce((s, v) => s + n(v.previsto) * n(v.peso_unit), 0);
+                const pesoRec = g.volumes.reduce((s, v) => s + n(v.recebido) * n(v.peso_unit), 0);
+                return [
+                  <tr key={`h${g.chave}`} className="faixa">
+                    <td colSpan={3} className="esq">ESTRUTURA METÁLICA {g.tipo}{varios ? ` · ${g.linha} ${g.canteiro.toUpperCase()}` : ''}</td>
+                    <td colSpan={2} className="g0 dir">PESO PREVISTO Kg:</td><td>{num(pesoPrev, 2)}</td>
+                    <td className="g0 dir">PESO RECEBIDO Kg:</td><td>{num(pesoRec, 2)}</td><td className="g0" />
+                  </tr>,
+                  ...mostrar.flatMap(([parte, vs]) => {
+                    const e = cc(g, parte);
+                    const conj = n(e?.conjunto);
+                    const prev = n(e?.previsto ?? vs[0].previsto);
+                    const dica = e?.torres ? `Atende ${e.atendidas} de ${e.torres} torres na sequência de ataque` + (e.proxima_torre ? ` · próxima: ${e.proxima_torre} (seq. ${e.proxima_seq ?? '—'})` : '') : '';
+                    return vs.map((v, i) => (
+                      <tr key={v.material_id} className={i === 0 ? 'ini-parte' : ''}>
+                        <td className="tor">{g.tipo}</td>
+                        <td className="esq">{v.descricao}</td>
+                        <td className="esq parte">{parte}</td>
+                        <td className="g0">{num(v.previsto)}</td><td>{num(v.peso_unit, 2)}</td><td>{num(n(v.previsto) * n(v.peso_unit), 2)}</td>
+                        <td className={`g0 ${n(v.recebido) >= n(v.previsto) ? 'rec-ok' : n(v.recebido) > 0 ? 'rec-parc' : ''}`}>{n(v.recebido) ? num(v.recebido) : '-'}</td>
+                        <td>{n(v.recebido) ? num(n(v.recebido) * n(v.peso_unit), 2) : '-'}</td>
+                        {i === 0 && (
+                          <td rowSpan={vs.length} className={`g0 conj ${conj >= prev ? 'pint-ok' : ''}`} title={dica}>
+                            {num(conj)}
+                            {e?.proxima_torre && <Link className="prox" to={`/lista?q=${encodeURIComponent(e.proxima_torre)}`}>próx. {e.proxima_torre}</Link>}
+                          </td>
+                        )}
+                      </tr>
+                    ));
+                  }),
+                ];
               })}
             </tbody>
           </table>

@@ -44,3 +44,16 @@ table.est tr.parte:hover > td.pint-falta { background: #efaea7; }
   main:has(> .estoque.cheia) { overflow: auto; display: block; }
   .estoque-tabela { max-height: 70vh; }
 }
+
+/* VOLUMES RECEBIDOS (layout do controle) */
+table.est.vr thead tr.sub th { top: 27px; font-size: 11px; }
+table.est.vr td { padding: 2px 8px; font-size: 12.5px; }
+table.est.vr tr.faixa td { background: var(--navy-2); color: #fff; font-weight: 700; font-size: 12px; border-color: var(--navy-2); }
+table.est.vr tr.faixa td.dir { text-align: right; font-weight: 400; opacity: .9; }
+table.est.vr td.tor, table.est.vr td.parte { color: var(--muted); font-size: 12px; }
+table.est.vr tr.ini-parte > td { border-top: 1px solid var(--line); }
+table.est.vr td.conj { font-size: 17px; font-weight: 700; vertical-align: middle; background: #f3f6fb; }
+table.est.vr td.conj.pint-ok { background: #bfe6cb; }
+table.est.vr td.conj .prox { display: block; font-size: 11px; font-weight: 400; margin-top: 2px; }
+table.est.vr td.rec-ok { background: #e2f3e7; }
+table.est.vr td.rec-parc { background: #fdf3d8; }
