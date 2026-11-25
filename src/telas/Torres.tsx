@@ -18,8 +18,9 @@ export function Torres({ aba }: { aba: Aba }) {
   const auto = useStatusAuto();
   // status automático (a LISTA manda); o digitado no controle fica em status_controle só para comparação
   const torres = useMemo(() => {
-    const m = new Map(auto.dados.map((a) => [a.torre_id, a.status]));
-    return base.torres.map((t) => ({ ...t, status_controle: t.status, status: t.status === null ? null : m.get(t.id) ?? 'Faltante' }));
+    const m = new Map(auto.dados.map((a) => [a.torre_id, a]));
+    return base.torres.map((t) => ({ ...t, status_controle: t.status, status: t.status === null ? null : m.get(t.id)?.status ?? 'Faltante',
+      fixadores_faltando: m.get(t.id)?.fixadores_faltando, fixadores_completos: m.get(t.id)?.fixadores_completos }));
   }, [base.torres, auto.dados]);
   const carregando = base.carregando || auto.carregando;
   const erro = base.erro ?? auto.erro;
@@ -338,6 +339,9 @@ export function FichaTorre({ t, cores, aoFechar }: { t: Torre | null; cores: Map
                 {t.status_controle && t.status_controle.trim().toLowerCase() !== (t.status ?? '').toLowerCase() && (
                   <tr><td className="muted">Status digitado no controle</td><td>{t.status_controle} <span className="muted">(difere do automático)</span></td></tr>
                 )}
+                <tr><td className="muted">Fixadores (granel, pela sequência)</td><td>{t.fixadores_completos == null ? '—'
+                  : t.fixadores_completos ? <span className="ok-txt">completos</span>
+                  : <span className="warn">faltam {t.fixadores_faltando} fixador(es)</span>} <span className="muted">(ainda não entra no status)</span></td></tr>
                 <tr><td className="muted">Ancoragem</td><td>{t.ancoragem ? 'sim' : 'não'}</td></tr>
                 <tr><td className="muted">Arranjo de ferragens</td><td>{t.arranjo_ferragens ?? '—'}</td></tr>
               </tbody>

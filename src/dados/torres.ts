@@ -22,7 +22,9 @@ export type Torre = {
   tramo: number | null;
   // aba LISTA do controle do canteiro (null = controle ainda não importado)
   status: string | null;
-  status_controle?: string | null;  // status digitado no controle (só para comparar; o que vale é o automático)
+  status_controle?: string | null;
+  fixadores_faltando?: number;          // fixadores a granel que o estoque (pela sequência) ainda não cobre
+  fixadores_completos?: boolean | null;  // status digitado no controle (só para comparar; o que vale é o automático)
   sequencia: number | null;
   composicao: Record<string, number> | null;
   fonte: string | null;
@@ -84,5 +86,6 @@ export const useTorreComponentes = () =>
   useTabela<TorreComponente>('torre_componente', 'torre_id, chave, completo, necessidade, disponivel_antes', ['torre_id', 'chave']);
 
 // Status automático (a LISTA manda): Entregue = todos os componentes completos pelo estoque; fixadores ainda não entram.
-export type StatusAuto = { torre_id: number; status: 'Entregue' | 'Faltante'; componentes: number; completos: number };
-export const useStatusAuto = () => useTabela<StatusAuto>('torre_status_auto', 'torre_id, status, componentes, completos', ['torre_id']);
+export type StatusAuto = { torre_id: number; status: 'Entregue' | 'Faltante'; componentes: number; completos: number;
+  fixadores_faltando: number; fixadores_completos: boolean | null };
+export const useStatusAuto = () => useTabela<StatusAuto>('torre_status_auto', 'torre_id, status, componentes, completos, fixadores_faltando, fixadores_completos', ['torre_id']);
