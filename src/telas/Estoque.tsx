@@ -10,7 +10,7 @@ type Aba = 'volumes' | 'fixadores';
 const n = (v: number | string | null | undefined) => Number(v ?? 0);
 
 // Estoque = VOLUMES RECEBIDOS (layout do controle) e fixadores, só do que tem previsto no escopo.
-// O conjunto completo é o do estoque — o mesmo que pinta a Lista — e mostra até onde chega na sequência de ataque.
+// Foco nos canteiros: abre no primeiro canteiro do escopo; "Geral" (somado por linha) fica por último.
 export function Estoque() {
   const { inclui } = useEscopo();
   const saldos = useSaldos();
@@ -26,7 +26,36 @@ export function Estoque() {
   };
 
   const doEscopo = useMemo(() => saldos.dados.filter((s) => inclui(s.linha, s.canteiro) && n(s.previsto) > 0), [saldos.dados, inclui]);
-  const varios = new Set(doEscopo.map((s) => `${s.linha}|${s.canteiro}`)).size > 1;
+  const canteiros = useMemo(() => [...new Map(doEscopo.map((s) => [`${s.linha}|${s.canteiro}`, s])).values()]
+    .sort((a, b) => a.linha.localeCompare(b.linha) || a.canteiro_id - b.canteiro_id)
+    .map((s) => ({ chave: `${s.linha}|${s.canteiro}`, linha: s.linha, canteiro: s.canteiro })), [doEscopo]);
+  const variasLinhas = new Set(canteiros.map((c) => c.linha)).size > 1;
+  const pedido = params.get('cant') ?? '';
+  const atual = pedido === 'geral' && canteiros.length > 1 ? 'geral' : canteiros.find((c) => c.chave === pedido)?.chave ?? canteiros[0]?.chave ?? '';
+
+  // Geral: soma os canteiros da mesma linha (previsto, recebido e conjunto completo de cada canteiro)
+  const { saldosVis, estVis } = useMemo(() => {
+    if (atual !== 'geral') {
+      return { saldosVis: doEscopo.filter((s) => `${s.linha}|${s.canteiro}` === atual), estVis: est.dados };
+    }
+    const m = new Map<string, Saldo>();
+    for (const s of doEscopo) {
+      const k = `${s.linha}|${s.secao}|${s.descricao}`;
+      const a = m.get(k);
+      if (a) m.set(k, { ...a, previsto: n(a.previsto) + n(s.previsto), recebido: n(a.recebido) + n(s.recebido), ordem: Math.min(a.ordem, s.ordem) });
+      else m.set(k, { ...s, canteiro: 'Geral', canteiro_id: 0, previsto: n(s.previsto), recebido: n(s.recebido) });
+    }
+    const e = new Map<string, EstoqueParte>();
+    for (const x of est.dados) {
+      if (!canteiros.some((c) => c.linha === x.linha && c.canteiro === x.canteiro)) continue;
+      const k = `${x.linha}|${x.tipo}|${x.parte}`;
+      const a = e.get(k);
+      if (a) e.set(k, { ...a, conjunto: n(a.conjunto) + n(x.conjunto), previsto: n(a.previsto) + n(x.previsto),
+        torres: n(a.torres) + n(x.torres), atendidas: n(a.atendidas) + n(x.atendidas), proxima_torre: null, proxima_seq: null, ultima_atendida: null });
+      else e.set(k, { ...x, canteiro: 'Geral', proxima_torre: null, proxima_seq: null, ultima_atendida: null });
+    }
+    return { saldosVis: [...m.values()], estVis: [...e.values()] };
+  }, [atual, doEscopo, est.dados, canteiros]);
 
   if (saldos.carregando || est.carregando) return <><Titulo texto="Estoque" /><p className="muted">Carregando…</p></>;
   const erro = saldos.erro ?? est.erro;
@@ -35,12 +64,25 @@ export function Estoque() {
   return (
     <div className="estoque cheia">
       <Titulo texto="Estoque" />
-      <Abas<Aba> abas={[['volumes', 'Volumes'], ['fixadores', 'Fixadores']]} atual={aba} aoMudar={(a) => mudar('aba', a === 'volumes' ? '' : a)} />
+      <div className="toolbar" style={{ marginBottom: 6 }}>
+        <Abas<Aba> abas={[['volumes', 'Volumes'], ['fixadores', 'Fixadores']]} atual={aba} aoMudar={(a) => mudar('aba', a === 'volumes' ? '' : a)} />
+        <span className="grow" />
+        {canteiros.length > 1 && (
+          <div className="seg" role="group" aria-label="Canteiro">
+            {canteiros.map((c) => (
+              <button key={c.chave} className={atual === c.chave ? 'on' : ''} onClick={() => mudar('cant', c.chave)}>
+                {variasLinhas ? `${c.linha} · ` : ''}{c.canteiro}
+              </button>
+            ))}
+            <button className={atual === 'geral' ? 'on' : ''} onClick={() => mudar('cant', 'geral')}>Geral</button>
+          </div>
+        )}
+      </div>
       {doEscopo.length === 0
         ? <div className="callout">Nada previsto para este escopo nos dados importados.</div>
         : aba === 'volumes'
-          ? <Volumes saldos={doEscopo.filter((s) => s.parte)} est={est.dados} varios={varios} tipos={tipos} soFalta={soFalta} mudar={mudar} />
-          : <Fixadores fixadores={doEscopo.filter((s) => s.secao.startsWith('FIXADORES'))} varios={varios} soFalta={soFalta} mudar={mudar} />}
+          ? <Volumes saldos={saldosVis.filter((s) => s.parte)} est={estVis} varios={atual === 'geral' && variasLinhas} tipos={tipos} soFalta={soFalta} mudar={mudar} />
+          : <Fixadores fixadores={saldosVis.filter((s) => s.secao.startsWith('FIXADORES'))} varios={atual === 'geral' && variasLinhas} soFalta={soFalta} mudar={mudar} />}
     </div>
   );
 }
@@ -92,7 +134,7 @@ export function Volumes({ saldos, est, varios, tipos, soFalta, mudar }: {
           <table className="est vr">
             <thead>
               <tr>
-                <th rowSpan={2} className="esq">Parte - matriz</th><th rowSpan={2} className="esq">Parte</th>
+                <th rowSpan={2}>Parte - matriz</th><th rowSpan={2}>Parte</th>
                 <th colSpan={3} className="g0">Previsto</th><th colSpan={2} className="g0">Recebido</th><th rowSpan={2} className="g0">Conjunto completo</th>
               </tr>
               <tr className="sub"><th className="g0">Quant.</th><th>Peso unit.</th><th>Peso total</th><th className="g0">Quant.</th><th>Peso</th></tr>
