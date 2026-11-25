@@ -106,7 +106,7 @@ export function Inicio() {
               <tr key={t}><td>{t}</td><td className="r num">{a.prev}</td><td className="r num">{a.comp}</td><td><Porcentagem valor={a.prev ? a.comp / a.prev : 0} ok={a.comp >= a.prev} /></td></tr>
             ))}</tbody>
           </table>
-          <div className="foot"><Link to="/mapa">Ver mapa de estruturas</Link> <span className="muted">· status automático pela Lista (fixadores ainda não entram)</span></div>
+          <div className="foot"><Link to="/mapa">Ver mapa de estruturas</Link> <span className="muted">· status automático: estrutura pela Lista, fixadores a granel só para torres com estrutura completa</span></div>
         </div>
 
         <div className="card">

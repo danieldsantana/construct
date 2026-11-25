@@ -1,6 +1,6 @@
 import { useEffect, useMemo } from 'react';
 import { useSearchParams } from 'react-router';
-import { COMPOSICAO, formatarMetros, statusDaTorre, useLinhas, useStatusAuto, useTorreComponentes, useTorres, type ClasseStatus, type Torre, type TorreComponente } from '../dados/torres';
+import { COMPOSICAO, formatarMetros, statusDaTorre, useFixadoresFaltando, useLinhas, useStatusAuto, useTorreComponentes, useTorres, type ClasseStatus, type Torre, type TorreComponente } from '../dados/torres';
 import { useEscopo } from '../lib/escopo';
 import { num } from '../lib/formato';
 import { Titulo } from '../componentes/Titulo';
@@ -236,8 +236,8 @@ export function Mapa({ torres, selId, abrir }: { torres: Torre[]; selId: number 
   return (
     <>
       <div className="legend muted" style={{ fontSize: 12.5, display: 'flex', gap: 14, marginBottom: 8, flexWrap: 'wrap' }}>
-        <span><i className="b ok" />Entregue (todos os componentes completos na Lista)</span><span><i className="b falta" />Faltante</span>
-        <span><i className="b sf" />Outro status</span><span><i className="b sem" />Sem controle importado</span>
+        <span><i className="b ok" />Entregue (estrutura e fixadores completos)</span><span><i className="b sf" />SF (estrutura completa, faltam fixadores)</span><span><i className="b falta" />Faltante</span>
+        <span><i className="b sem" />Sem controle importado</span>
         <span>· traço laranja fino sob o número = ancoragem</span>
       </div>
       {tramos.map(([k, ts]) => {
@@ -281,7 +281,7 @@ export function MapaContinuo({ torres, selId, abrir }: { torres: Torre[]; selId:
   return (
     <>
       <div className="legend muted" style={{ fontSize: 12.5, display: 'flex', gap: 14, marginBottom: 8, flexWrap: 'wrap' }}>
-        <span><i className="b ok" />Entregue (todos os componentes completos na Lista)</span><span><i className="b falta" />Faltante</span>
+        <span><i className="b ok" />Entregue (estrutura e fixadores completos)</span><span><i className="b sf" />SF (estrutura completa, faltam fixadores)</span><span><i className="b falta" />Faltante</span>
         <span><i className="b sem" />Sem controle importado</span>
       </div>
       {canteiros.map(([nome, ts]) => {
@@ -339,9 +339,6 @@ export function FichaTorre({ t, cores, aoFechar }: { t: Torre | null; cores: Map
                 {t.status_controle && t.status_controle.trim().toLowerCase() !== (t.status ?? '').toLowerCase() && (
                   <tr><td className="muted">Status digitado no controle</td><td>{t.status_controle} <span className="muted">(difere do automático)</span></td></tr>
                 )}
-                <tr><td className="muted">Fixadores (granel, pela sequência)</td><td>{t.fixadores_completos == null ? '—'
-                  : t.fixadores_completos ? <span className="ok-txt">completos</span>
-                  : <span className="warn">faltam {t.fixadores_faltando} fixador(es)</span>} <span className="muted">(ainda não entra no status)</span></td></tr>
                 <tr><td className="muted">Ancoragem</td><td>{t.ancoragem ? 'sim' : 'não'}</td></tr>
                 <tr><td className="muted">Arranjo de ferragens</td><td>{t.arranjo_ferragens ?? '—'}</td></tr>
               </tbody>
@@ -365,6 +362,7 @@ export function FichaTorre({ t, cores, aoFechar }: { t: Torre | null; cores: Map
             ) : <p className="muted">Controle deste canteiro ainda não importado.</p>}
             {t.fonte && <p className="muted" style={{ fontSize: 12, margin: '6px 0 0' }}>Fonte: aba {abaDaFonte(t.fonte)} do controle</p>}
           </section>
+          <FixadoresDaTorre t={t} />
           <p className="muted" style={{ fontSize: 12.5, margin: 0 }}>Verde = o conjunto completo em estoque chega até esta torre na sequência de ataque; vermelho = ainda não. Situações da torre (zerada, pré-montagem…) entram quando definirmos as regras.</p>
         </>
       )}
@@ -380,4 +378,27 @@ function abaDaFonte(fonte: string) {
 // Pintura da célula pelo estoque (verde = completo para a torre na sequência de ataque; vermelho = falta)
 function classeCor(p: TorreComponente | undefined) {
   return p ? (p.completo ? 'pint-ok' : 'pint-falta') : '';
+}
+
+// Fixadores da torre: o granel é distribuído só entre torres com estrutura completa, na sequência de ataque.
+function FixadoresDaTorre({ t }: { t: Torre }) {
+  const falta = useFixadoresFaltando(t.status === 'Entregue' || t.status === 'SF' ? t.id : null);
+  if (t.status !== 'Entregue' && t.status !== 'SF') {
+    return <p className="muted" style={{ fontSize: 12.5, margin: 0 }}>Fixadores: só são reservados para torres com a estrutura completa.</p>;
+  }
+  return (
+    <section>
+      <h3 className="dr-t">Fixadores (granel, pela sequência de ataque)</h3>
+      {falta.carregando ? <p className="muted">Carregando…</p>
+        : falta.dados.length === 0 ? <p className="ok-txt" style={{ margin: 0 }}>Todos os fixadores completos.</p>
+        : (
+          <table>
+            <thead><tr><th>Fixador que falta</th><th className="r">Necessidade</th><th className="r">Disponível na vez da torre</th></tr></thead>
+            <tbody>{falta.dados.map((f) => (
+              <tr key={f.fixador}><td>{f.fixador}</td><td className="r num">{num(f.necessidade)}</td><td className="r num warn">{num(f.disponivel)}</td></tr>
+            ))}</tbody>
+          </table>
+        )}
+    </section>
+  );
 }

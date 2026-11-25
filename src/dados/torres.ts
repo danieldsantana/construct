@@ -1,4 +1,6 @@
+import { useEffect, useState } from 'react';
 import { useTabela } from '../lib/dados';
+import { supabase } from '../lib/supabase';
 
 export type Torre = {
   id: number;
@@ -43,7 +45,8 @@ export type ClasseStatus = 'ok' | 'falta' | 'sf' | 'sem';
 export function statusDaTorre(t: Pick<Torre, 'status'>): { texto: string; classe: ClasseStatus } {
   const s = (t.status ?? '').trim();
   if (!s) return { texto: t.status === null ? 'Sem controle importado' : 'Sem status', classe: 'sem' };
-  const texto = s.charAt(0).toUpperCase() + s.slice(1).toLowerCase();
+  // SF = estrutura completa, faltam fixadores (amarelo, como no controle)
+  const texto = s.toUpperCase() === 'SF' ? 'SF' : s.charAt(0).toUpperCase() + s.slice(1).toLowerCase();
   const k = texto.toLowerCase();
   return { texto, classe: k === 'entregue' ? 'ok' : k === 'faltante' ? 'falta' : 'sf' };
 }
@@ -89,3 +92,18 @@ export const useTorreComponentes = () =>
 export type StatusAuto = { torre_id: number; status: 'Entregue' | 'Faltante'; componentes: number; completos: number;
   fixadores_faltando: number; fixadores_completos: boolean | null };
 export const useStatusAuto = () => useTabela<StatusAuto>('torre_status_auto', 'torre_id, status, componentes, completos, fixadores_faltando, fixadores_completos', ['torre_id']);
+
+// Fixadores que faltam para uma torre (só torres com estrutura completa); busca sob demanda ao abrir a ficha
+export type FixadorFalta = { fixador: string; necessidade: number; disponivel: number };
+export function useFixadoresFaltando(torreId: number | null) {
+  const [estado, setEstado] = useState<{ id: number | null; dados: FixadorFalta[]; carregando: boolean }>({ id: null, dados: [], carregando: false });
+  useEffect(() => {
+    if (!torreId) return;
+    let ativo = true;
+    setEstado({ id: torreId, dados: [], carregando: true });
+    supabase.from('torre_fixador_falta').select('fixador, necessidade, disponivel').eq('torre_id', torreId).order('fixador')
+      .then(({ data }) => { if (ativo) setEstado({ id: torreId, dados: (data ?? []) as FixadorFalta[], carregando: false }); });
+    return () => { ativo = false; };
+  }, [torreId]);
+  return estado.id === torreId ? estado : { id: torreId, dados: [], carregando: !!torreId };
+}
