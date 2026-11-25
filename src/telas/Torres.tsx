@@ -32,6 +32,7 @@ export function Torres({ aba }: { aba: Aba }) {
   const tramo = params.get('tramo') ?? '';
   const st = params.get('st') ?? '';
   const ordem = params.get('ordem') === 'seq' ? 'seq' : 'torre';
+  const vistaMapa = params.get('vista') === 'tramo' ? 'tramo' : 'continuo';
   const selId = Number(params.get('torre')) || null;
 
   function mudar(chave: string, valor: string) {
@@ -86,6 +87,12 @@ export function Torres({ aba }: { aba: Aba }) {
           ))}
         </div>
         <span className="grow" />
+        {aba === 'mapa' && (
+          <div className="seg" role="group" aria-label="Visualização do mapa">
+            <button className={vistaMapa === 'continuo' ? 'on' : ''} onClick={() => mudar('vista', '')}>Contínuo</button>
+            <button className={vistaMapa === 'tramo' ? 'on' : ''} onClick={() => mudar('vista', 'tramo')}>Por tramo</button>
+          </div>
+        )}
         {aba === 'lista' && (
           <div className="seg" role="group" aria-label="Ordem">
             <button className={ordem === 'torre' ? 'on' : ''} onClick={() => mudar('ordem', '')}>Ordem da linha</button>
@@ -108,7 +115,9 @@ export function Torres({ aba }: { aba: Aba }) {
 
       {aba === 'lista'
         ? <Lista torres={visiveis} cores={cores} completas={completas} ordem={ordem} selId={selId} abrir={(id) => mudar('torre', String(id))} escolherTramo={(t) => mudar('tramo', `${t.linha_sigla}-${t.tramo}`)} />
-        : <Mapa torres={visiveis} selId={selId} abrir={(id) => mudar('torre', String(id))} />}
+        : vistaMapa === 'continuo'
+          ? <MapaContinuo torres={visiveis} selId={selId} abrir={(id) => mudar('torre', String(id))} />
+          : <Mapa torres={visiveis} selId={selId} abrir={(id) => mudar('torre', String(id))} />}
 
       <FichaTorre t={sel} cores={cores} aoFechar={() => mudar('torre', '')} />
     </div>
@@ -235,6 +244,59 @@ export function Mapa({ torres, selId, abrir }: { torres: Torre[]; selId: number 
                   <span className="t">{t.tipo} · {formatarMetros(t.altura_util)}</span>
                   <span className={`b ${statusDaTorre(t).classe}`} />
                 </button>
+              ))}
+            </div>
+          </section>
+        );
+      })}
+    </>
+  );
+}
+
+// Mapa contínuo (como a aba MAPA ESTRUTURA do controle): um mapa por canteiro, em blocos de 24 torres na ordem da linha;
+// linhas do bloco: altura, nº, torre, tipo e status (status automático, pela Lista).
+const POR_BLOCO = 24;
+export function MapaContinuo({ torres, selId, abrir }: { torres: Torre[]; selId: number | null; abrir: (id: number) => void }) {
+  const canteiros = useMemo(() => {
+    const m = new Map<string, Torre[]>();
+    for (const t of torres) { const k = `${t.linha_sigla} · ${t.canteiro}`; m.set(k, [...(m.get(k) ?? []), t]); }
+    return [...m];
+  }, [torres]);
+  if (!torres.length) return <p className="muted">Nenhuma torre neste recorte.</p>;
+  return (
+    <>
+      <div className="legend muted" style={{ fontSize: 12.5, display: 'flex', gap: 14, marginBottom: 8, flexWrap: 'wrap' }}>
+        <span><i className="b ok" />Entregue (todos os componentes completos na Lista)</span><span><i className="b falta" />Faltante</span>
+        <span><i className="b sem" />Sem controle importado</span>
+      </div>
+      {canteiros.map(([nome, ts]) => {
+        const blocos: Torre[][] = [];
+        for (let i = 0; i < ts.length; i += POR_BLOCO) blocos.push(ts.slice(i, i + POR_BLOCO));
+        const entregues = ts.filter((t) => statusDaTorre(t).classe === 'ok').length;
+        return (
+          <section key={nome} className="panel mapa-cont" style={{ marginBottom: 12 }}>
+            <div className="tramo-h">
+              <b>{nome.toUpperCase()}</b>
+              <span className="muted num">{ts[0].numero} a {ts[ts.length - 1].numero} · {ts.length} torres</span>
+              <span className="grow" />
+              <span className="num" style={{ fontSize: 13 }}>{entregues} entregue{entregues === 1 ? '' : 's'}</span>
+            </div>
+            <div className="mapa-blocos">
+              {blocos.map((b, bi) => (
+                <table key={bi} className="mapa-bloco">
+                  <tbody>
+                    <tr className="h"><th>h</th>{b.map((t) => <td key={t.id}>{formatarMetros(t.altura_util)}</td>)}</tr>
+                    <tr className="nn"><th>Nº</th>{b.map((t, i) => <td key={t.id}>{bi * POR_BLOCO + i + 1}</td>)}</tr>
+                    <tr className="tt"><th>Torre</th>{b.map((t) => (
+                      <td key={t.id} className={`${t.id === selId ? 'sel' : ''} ${t.ancoragem ? 'anc' : ''}`} onClick={() => abrir(t.id)} title={`${t.numero} · ${t.tipo} · ${statusDaTorre(t).texto}`}>{t.numero}</td>
+                    ))}</tr>
+                    <tr className="tp"><th>Tipo</th>{b.map((t) => <td key={t.id}>{t.tipo}</td>)}</tr>
+                    <tr className="stt"><th>Status</th>{b.map((t) => {
+                      const s = statusDaTorre(t);
+                      return <td key={t.id} className={`st-${s.classe}`} onClick={() => abrir(t.id)}>{s.texto === 'Sem controle importado' ? '—' : s.texto}</td>;
+                    })}</tr>
+                  </tbody>
+                </table>
               ))}
             </div>
           </section>
