@@ -282,7 +282,7 @@ table.cruz tbody tr.grupo-hl > td { background-image: linear-gradient(rgba(0, 46
 /* seleção de células (clique / Ctrl+clique), fica marcada como no Excel */
 table.cruz tbody td { cursor: cell; }
 /* mesma cruz do mouse, fixa e mais leve: linha e coluna da seleção sombreadas, célula um pouco mais escura */
-table.cruz tbody td.sel-lin, table.cruz tbody td.sel-col { background-image: linear-gradient(rgba(0, 46, 109, .045), rgba(0, 46, 109, .045)); }
+table.cruz tbody td.sel-lin, table.cruz tbody td.sel-col { background-image: linear-gradient(rgba(0, 46, 109, .02), rgba(0, 46, 109, .02)); }
 table.cruz tbody td.selc { background-image: linear-gradient(rgba(0, 46, 109, .055), rgba(0, 46, 109, .055)) !important; }
 table.cruz { user-select: none; }
 .resumo-sel { font-size: 12.5px; color: var(--navy); }
