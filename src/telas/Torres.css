@@ -54,11 +54,11 @@ main:has(> .torres.cheia) { overflow: hidden; padding-bottom: 12px; display: fle
 .torres-tabela table.lista th.g0, .torres-tabela table.lista th.grp { border-left: 2px solid rgba(255,255,255,.55); }
 
 /* pintura da LISTA: verde = completo, vermelho = falta (tons suaves, no visual da ferramenta) */
-.torres-tabela table.lista td.pint-ok, .drawer td.pint-ok { background: #e2f3e7; color: #17663a; font-weight: 600; }
-.torres-tabela table.lista td.pint-falta, .drawer td.pint-falta { background: #fbe4e2; color: #a8261d; font-weight: 600; }
-.torres-tabela table.lista tbody tr:hover td.pint-ok { background: #cfeAd8; }
-.torres-tabela table.lista tbody tr:hover td.pint-falta { background: #f6d0cc; }
+.torres-tabela table.lista td.pint-ok, .drawer td.pint-ok { background: #bfe6cb; color: #0f5a2c; font-weight: 600; }
+.torres-tabela table.lista td.pint-falta, .drawer td.pint-falta { background: #f6c4bf; color: #8f1d15; font-weight: 600; }
+.torres-tabela table.lista tbody tr:hover td.pint-ok { background: #a9dcb9; }
+.torres-tabela table.lista tbody tr:hover td.pint-falta { background: #efaea7; }
 /* célula sem componente: apagada, não chama atenção */
-.torres-tabela table.lista td.vazio { background: #f7f8fa; border-color: #eef0f3; }
-.torres-tabela table.lista tbody tr:hover td.vazio { background: #eef1f6; }
+.torres-tabela table.lista td.vazio { background: #fbfbfc; border-color: #f3f4f6; }
+.torres-tabela table.lista tbody tr:hover td.vazio { background: #f3f5f9; }
 .torres-tabela table.lista td.g0.vazio { border-left: 2px solid var(--line); }  /* mantém a divisa grossa entre grupos */
