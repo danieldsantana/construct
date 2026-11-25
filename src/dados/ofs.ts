@@ -24,3 +24,16 @@ export const useOFNFs = () => useTabela<OFNF>('of_nf', '*', ['of_id', 'nf_id']);
 
 // 'OF-71607-EM-BRM-114' -> 'OF-114' (como nos controles do T4)
 export const ofCurta = (o: Pick<OF, 'codigo' | 'numero'>) => (o.numero !== null ? `OF-${o.numero}` : o.codigo);
+
+// Atendimento por componentes: item da OF × conjunto completo formado só com os volumes das NFs da OF (na unidade da OF)
+export type OFComponente = { of_item_id: number; of_id: number; quantidade: number; peso_kg: number; componente: string | null; entregue: number | null };
+export const useOFComponentes = () =>
+  useTabela<OFComponente>('of_componente', 'of_item_id, of_id, quantidade, peso_kg, componente, entregue', ['of_id', 'of_item_id']);
+
+// % do peso da OF em componentes completos: cada item conta min(entregue, qtd) / qtd do seu peso
+export function atendimentoComponentes(itens: OFComponente[]) {
+  const vs = itens.filter((i) => i.componente && Number(i.quantidade) > 0);
+  const peso = vs.reduce((s, i) => s + Number(i.peso_kg), 0);
+  const ok = vs.reduce((s, i) => s + Math.min(Number(i.entregue ?? 0), Number(i.quantidade)) / Number(i.quantidade) * Number(i.peso_kg), 0);
+  return peso ? ok / peso : 0;
+}

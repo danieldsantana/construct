@@ -293,3 +293,4 @@ table.selecionavel tbody td { cursor: cell; }
 table.selecionavel tbody td.selc { background-image: linear-gradient(rgba(0, 46, 109, .055), rgba(0, 46, 109, .055)) !important; }
 table.selecionavel tbody td.sel-ref { background-image: linear-gradient(rgba(0, 46, 109, .055), rgba(0, 46, 109, .055)); }
 table.selecionavel tbody td.tnum.sel-ref { background-image: linear-gradient(rgba(255, 255, 255, .16), rgba(255, 255, 255, .16)); }
+.ok-txt { color: var(--ok); font-weight: 600; }

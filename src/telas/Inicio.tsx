@@ -4,7 +4,7 @@ import { Porcentagem, Titulo } from '../componentes/Titulo';
 import { useEscopo } from '../lib/escopo';
 import { data, num } from '../lib/formato';
 import { useEstoqueParte, useNotasFiscais, useSaldos, type NotaFiscal } from '../dados/recebimento';
-import { ofCurta, useOFs, useOFNFs } from '../dados/ofs';
+import { atendimentoComponentes, ofCurta, useOFComponentes, useOFs, useOFNFs } from '../dados/ofs';
 import { useTabelaAuto } from '../dados/inicio';
 
 const n = (v: number | string | null | undefined) => Number(v ?? 0);
@@ -22,6 +22,7 @@ export function Inicio() {
   const saldos = useSaldos();
   const ofs = useOFs();
   const ofNfs = useOFNFs();
+  const ofComps = useOFComponentes();
 
   // NF: local de entrega prevalece (mesma regra da tela Notas)
   const nfNoEscopo = (x: NotaFiscal) => {
@@ -115,11 +116,11 @@ export function Inicio() {
             <tbody>{ofsEscopo.map(({ o, pct }) => (
               <tr key={o.id} className="clk" onClick={() => ir(`/ofs?of=${o.id}`)}>
                 <td><b>{ofCurta(o)}</b></td><td>{o.canteiro ?? '—'}</td><td><Porcentagem valor={pct} ok={pct >= 1} /></td>
-                <td className="muted" style={{ fontSize: 12 }}>a definir</td>
+                <td>{(() => { const v = atendimentoComponentes(ofComps.dados.filter((c) => c.of_id === o.id)); return <Porcentagem valor={v} ok={v >= 1} />; })()}</td>
               </tr>
             ))}</tbody>
           </table>
-          <div className="foot"><Link to="/ofs">Ver OFs</Link> <span className="muted">· peso das NFs recebidas ÷ peso da OF</span></div>
+          <div className="foot"><Link to="/ofs">Ver OFs</Link> <span className="muted">· peso das NFs recebidas e peso em componentes completos</span></div>
         </div>
 
         <div className="card">

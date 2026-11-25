@@ -5,7 +5,7 @@ import { Gaveta } from '../componentes/Gaveta';
 import { useEscopo } from '../lib/escopo';
 import { data, num } from '../lib/formato';
 import { SITUACAO } from './Notas';
-import { ofCurta, useOFItens, useOFNFs, useOFs, type OF, type OFItem, type OFNF } from '../dados/ofs';
+import { atendimentoComponentes, ofCurta, useOFComponentes, useOFItens, useOFNFs, useOFs, type OF, type OFComponente, type OFItem, type OFNF } from '../dados/ofs';
 
 const n = (v: number | string | null | undefined) => Number(v ?? 0);
 const hoje = new Date().toISOString().slice(0, 10);
@@ -16,6 +16,12 @@ const hoje = new Date().toISOString().slice(0, 10);
 export function OFs() {
   const ofs = useOFs();
   const itens = useOFItens();
+  const comps = useOFComponentes();
+  const compPorOF = useMemo(() => {
+    const m = new Map<number, OFComponente[]>();
+    for (const c of comps.dados) m.set(c.of_id, [...(m.get(c.of_id) ?? []), c]);
+    return m;
+  }, [comps.dados]);
   const nfs = useOFNFs();
   const { inclui } = useEscopo();
   const [params, setParams] = useSearchParams();
@@ -52,7 +58,7 @@ export function OFs() {
       <div className="notes">
         Fonte: resumo de OFs do cliente (OFs BRAMETAL). <b>Atendimento por peso</b> = peso das NFs recebidas que citam a OF ÷ peso da OF.
         A OF da NF vem da linha "Ordem de Fabricação" dos controles do T4 ou, nas demais, do campo "OC:" do PDF da NF (os dois conferem onde existem juntos).
-        {' '}<b>Atendimento por componentes</b> entra depois de combinarmos o de-para entre os itens da OF e os volumes do controle.
+        {' '}<b>Atendimento por componentes</b> = parte do peso da OF em componentes completos, formados só com os volumes das NFs da OF (volumes de uma parte que vieram por OFs diferentes não completam nenhuma das duas). Para-raios "1 TORRE" = 2 peças/conjuntos; stub = 1 por perna.
       </div>
       {(naoRec > 0 || semCtrl > 0) && (
         <div className="callout">
@@ -72,22 +78,22 @@ export function OFs() {
             <thead><tr>
               <th>OF</th><th>Linha</th><th>Canteiro de entrega</th><th>Emitida</th><th>Entrega prevista</th>
               <th className="r">Itens</th><th className="r">Peso OF (t)</th><th className="r">NFs emitidas</th><th className="r">Recebidas</th>
-              <th className="r" title="Não recebidas + destino sem controle importado">Não recebidas</th><th className="r">Peso NFs rec. (t)</th><th>Atendido</th>
+              <th className="r" title="Não recebidas + destino sem controle importado">Não recebidas</th><th className="r">Peso NFs rec. (t)</th><th>Atendido (peso)</th><th>Componentes</th>
             </tr></thead>
             <tbody>
-              {doEscopo.map((o) => <Linha key={o.id} o={o} sel={o.id === selId} abrir={() => abrir(o.id)} />)}
+              {doEscopo.map((o) => <Linha key={o.id} o={o} comp={atendimentoComponentes(compPorOF.get(o.id) ?? [])} sel={o.id === selId} abrir={() => abrir(o.id)} />)}
             </tbody>
           </table>
         </div>
         {doEscopo.length === 0 && <p className="muted" style={{ padding: 10 }}>Nenhuma OF neste escopo.</p>}
       </section>
 
-      <FichaOF o={sel} itens={itens.dados.filter((i) => i.of_id === selId)} nfs={selId ? nfsPorOF.get(selId) ?? [] : []} aoFechar={() => abrir(null)} />
+      <FichaOF o={sel} comps={selId ? compPorOF.get(selId) ?? [] : []} itens={itens.dados.filter((i) => i.of_id === selId)} nfs={selId ? nfsPorOF.get(selId) ?? [] : []} aoFechar={() => abrir(null)} />
     </>
   );
 }
 
-export function Linha({ o, sel, abrir }: { o: OF; sel: boolean; abrir: () => void }) {
+export function Linha({ o, comp, sel, abrir }: { o: OF; comp: number; sel: boolean; abrir: () => void }) {
   const pct = n(o.peso_previsto) ? n(o.peso_recebido) / n(o.peso_previsto) : 0;
   const passou = !!o.entrega_prevista && o.entrega_prevista < hoje && pct < 1;
   return (
@@ -107,11 +113,13 @@ export function Linha({ o, sel, abrir }: { o: OF; sel: boolean; abrir: () => voi
       </td>
       <td className="r num rec">{n(o.peso_recebido) ? num(n(o.peso_recebido) / 1000, 1) : ''}</td>
       <td><Porcentagem valor={pct} ok={pct >= 1} /></td>
+      <td><Porcentagem valor={comp} ok={comp >= 1} /></td>
     </tr>
   );
 }
 
-export function FichaOF({ o, itens, nfs, aoFechar }: { o: OF | null; itens: OFItem[]; nfs: OFNF[]; aoFechar: () => void }) {
+export function FichaOF({ o, comps, itens, nfs, aoFechar }: { o: OF | null; comps: OFComponente[]; itens: OFItem[]; nfs: OFNF[]; aoFechar: () => void }) {
+  const ent = new Map(comps.map((c) => [c.of_item_id, c]));
   const recebidas = nfs.filter((x) => x.situacao !== 'nao_recebida').sort((a, b) => (a.recebida_em ?? '').localeCompare(b.recebida_em ?? ''));
   const pendentes = nfs.filter((x) => x.situacao === 'nao_recebida').sort((a, b) => (a.emissao ?? '').localeCompare(b.emissao ?? ''));
   const porCanteiro = new Map<string, number>();
@@ -130,12 +138,12 @@ export function FichaOF({ o, itens, nfs, aoFechar }: { o: OF | null; itens: OFIt
           <section>
             <h3 className="dr-t">Itens da OF</h3>
             <table>
-              <thead><tr><th>Componente</th><th className="r">Qtd.</th><th className="r">Peso (kg)</th></tr></thead>
+              <thead><tr><th>Componente</th><th className="r">Qtd.</th><th className="r">Entregue</th><th className="r">Peso (kg)</th></tr></thead>
               <tbody>
                 {tipos.flatMap((t) => [
-                  <tr key={`t${t}`} className="sec"><td colSpan={3}>{t}</td></tr>,
+                  <tr key={`t${t}`} className="sec"><td colSpan={4}>{t}</td></tr>,
                   ...itens.filter((i) => i.tipo_torre === t).map((i) => (
-                    <tr key={i.id}><td>{i.descricao}</td><td className="r num">{num(i.quantidade)}</td><td className="r num">{num(i.peso_kg, 1)}</td></tr>
+                    <tr key={i.id}><td>{i.descricao}</td><td className="r num">{num(i.quantidade)}</td><td className={`r num ${ent.get(i.id)?.componente ? (Number(ent.get(i.id)?.entregue ?? 0) >= Number(i.quantidade) ? 'ok-txt' : 'warn') : 'muted'}`}>{ent.get(i.id)?.componente ? num(ent.get(i.id)?.entregue ?? 0) : '—'}</td><td className="r num">{num(i.peso_kg, 1)}</td></tr>
                   )),
                 ])}
               </tbody>
