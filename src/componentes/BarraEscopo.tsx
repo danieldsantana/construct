@@ -2,7 +2,7 @@ import { useMemo } from 'react';
 import { useEscopo } from '../lib/escopo';
 import { useTorres } from '../dados/torres';
 
-// Barra de escopo em botões: ★ Meu escopo · Linha · Canteiro (canteiros na ordem da linha).
+// Barra de escopo em botões: ★ Meu escopo · Linha · Canteiro (canteiros na ordem da linha; "Todas"/"Todos" no fim).
 export function BarraEscopo() {
   const { escopo, setEscopo } = useEscopo();
   const { torres } = useTorres();
@@ -30,7 +30,7 @@ export function BarraEscopo() {
       <div className="seg-grupo">
         <span>Linha</span>
         <div className="seg">
-          {[['', 'Todas'], ...linhas.map((l) => [l, l])].map(([v, t]) => (
+          {[...linhas.map((l) => [l, l]), ['', 'Todas']].map(([v, t]) => (
             <button key={v} className={!escopo.meu && escopo.linha === v ? 'on' : ''}
                     onClick={() => mudar({ linha: v, canteiro: v && escopo.canteiro && !canteirosDe(v).includes(escopo.canteiro) ? '' : escopo.canteiro })}>{t}</button>
           ))}
@@ -39,7 +39,7 @@ export function BarraEscopo() {
       <div className="seg-grupo">
         <span>Canteiro</span>
         <div className="seg">
-          {[['', 'Todos'], ...canteiros.map((c) => [c, c])].map(([v, t]) => (
+          {[...canteiros.map((c) => [c, c]), ['', 'Todos']].map(([v, t]) => (
             <button key={v} className={!escopo.meu && escopo.canteiro === v ? 'on' : ''} onClick={() => mudar({ canteiro: v })}>{t}</button>
           ))}
         </div>

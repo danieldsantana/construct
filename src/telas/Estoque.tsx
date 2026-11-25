@@ -10,7 +10,7 @@ type Aba = 'volumes' | 'fixadores';
 const n = (v: number | string | null | undefined) => Number(v ?? 0);
 
 // Estoque = VOLUMES RECEBIDOS (layout do controle) e fixadores, só do que tem previsto no escopo.
-// Foco nos canteiros: abre no primeiro canteiro do escopo; "Geral" (somado por linha) fica por último.
+// Canteiro vem da barra de escopo do topo; com mais de um canteiro no escopo ("Todos"), mostra o Geral somado por linha.
 export function Estoque() {
   const { inclui } = useEscopo();
   const saldos = useSaldos();
@@ -30,8 +30,7 @@ export function Estoque() {
     .sort((a, b) => a.linha.localeCompare(b.linha) || a.canteiro_id - b.canteiro_id)
     .map((s) => ({ chave: `${s.linha}|${s.canteiro}`, linha: s.linha, canteiro: s.canteiro })), [doEscopo]);
   const variasLinhas = new Set(canteiros.map((c) => c.linha)).size > 1;
-  const pedido = params.get('cant') ?? '';
-  const atual = pedido === 'geral' && canteiros.length > 1 ? 'geral' : canteiros.find((c) => c.chave === pedido)?.chave ?? canteiros[0]?.chave ?? '';
+  const atual = canteiros.length > 1 ? 'geral' : canteiros[0]?.chave ?? '';
 
   // Geral: soma os canteiros da mesma linha (previsto, recebido e conjunto completo de cada canteiro)
   const { saldosVis, estVis } = useMemo(() => {
@@ -64,20 +63,7 @@ export function Estoque() {
   return (
     <div className="estoque cheia">
       <Titulo texto="Estoque" />
-      <div className="toolbar" style={{ marginBottom: 6 }}>
-        <Abas<Aba> abas={[['volumes', 'Volumes'], ['fixadores', 'Fixadores']]} atual={aba} aoMudar={(a) => mudar('aba', a === 'volumes' ? '' : a)} />
-        <span className="grow" />
-        {canteiros.length > 1 && (
-          <div className="seg" role="group" aria-label="Canteiro">
-            {canteiros.map((c) => (
-              <button key={c.chave} className={atual === c.chave ? 'on' : ''} onClick={() => mudar('cant', c.chave)}>
-                {variasLinhas ? `${c.linha} · ` : ''}{c.canteiro}
-              </button>
-            ))}
-            <button className={atual === 'geral' ? 'on' : ''} onClick={() => mudar('cant', 'geral')}>Geral</button>
-          </div>
-        )}
-      </div>
+      <Abas<Aba> abas={[['volumes', 'Volumes'], ['fixadores', 'Fixadores']]} atual={aba} aoMudar={(a) => mudar('aba', a === 'volumes' ? '' : a)} />
       {doEscopo.length === 0
         ? <div className="callout">Nada previsto para este escopo nos dados importados.</div>
         : aba === 'volumes'
