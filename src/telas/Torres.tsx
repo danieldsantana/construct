@@ -164,7 +164,7 @@ export function Lista({ torres, completas, ordem, selId, abrir, escolherTramo }:
               <th rowSpan={2} className="r">Altura (m)</th><th rowSpan={2} className="r">Tramo</th><th rowSpan={2}>Status</th>
               {comp.map((g) => <th key={g.grupo} colSpan={g.colunas.length} className="grp">{g.grupo}</th>)}
             </tr>
-            <tr>{comp.flatMap((g) => g.colunas.map((c) => <th key={c.chave} className="r sub">{c.rotulo}</th>))}</tr>
+            <tr>{comp.flatMap((g) => g.colunas.map((c, ci) => <th key={c.chave} className={`r sub ${ci === 0 ? 'g0' : ''}`}>{c.rotulo}</th>))}</tr>
           </thead>
           <tbody>
             {grupos.flatMap(([nome, ts], gi) => ts.map((t, i) => (
@@ -179,7 +179,7 @@ export function Lista({ torres, completas, ordem, selId, abrir, escolherTramo }:
                   <button className="tramo" onClick={(e) => { e.stopPropagation(); escolherTramo(t); }} title="Ver só este tramo">{t.tramo}</button>
                 </td>
                 <td><Status t={t} /></td>
-                {comp.flatMap((g) => g.colunas.map((c) => <td key={c.chave} className="r num comp">{valorComp(t, c.chave, c.metros)}</td>))}
+                {comp.flatMap((g) => g.colunas.map((c, ci) => <td key={c.chave} className={`r num comp ${ci === 0 ? 'g0' : ''}`}>{valorComp(t, c.chave, c.metros)}</td>))}
               </tr>
             )))}
           </tbody>
