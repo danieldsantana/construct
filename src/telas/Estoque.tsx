@@ -19,43 +19,79 @@ function useColunaSobMouse() {
   return { 'data-col': col ?? undefined, onMouseOver: sobre, onMouseLeave: () => setCol(null) };
 }
 
-// Seleção de células como no Excel: clique seleciona (fica marcada), Ctrl+clique soma/remove, Esc limpa.
-// A célula é identificada pela linha (data-k no <tr>) + índice da coluna; a marcação é aplicada após cada render.
+// Seleção de células como no Excel: clique seleciona, arrastar seleciona o retângulo, Ctrl soma áreas/células,
+// Esc limpa. A célula é identificada pela linha (data-k no <tr>) + índice da coluna; a marcação (célula + sombra leve
+// na linha e na coluna, como o destaque do mouse) é aplicada no DOM após cada render.
+type Pos = { r: number; c: number };
 function useSelecao() {
   const ref = useRef<HTMLTableElement>(null);
   const [sel, setSel] = useState<Set<string>>(new Set());
   const [resumo, setResumo] = useState<{ n: number; numeros: number; soma: number } | null>(null);
+  const arraste = useRef<{ ini: Pos; base: Set<string> } | null>(null);
+  const linhas = () => [...(ref.current?.querySelectorAll<HTMLTableRowElement>('tbody tr[data-k]') ?? [])];
   const chave = (td: HTMLTableCellElement) => `${(td.parentElement as HTMLElement).dataset.k}|${td.cellIndex}`;
-  const onClick = (e: MouseEvent<HTMLTableElement>) => {
-    if ((e.target as HTMLElement).closest('a, button, input')) return;
-    const td = (e.target as HTMLElement).closest('td');
-    if (!td || !(td.parentElement as HTMLElement)?.dataset.k) return;
-    const k = chave(td);
-    setSel((s) => {
-      if (e.ctrlKey || e.metaKey) { const x = new Set(s); if (x.has(k)) x.delete(k); else x.add(k); return x; }
-      return s.size === 1 && s.has(k) ? new Set() : new Set([k]);
-    });
+  const posDe = (alvo: EventTarget): { td: HTMLTableCellElement; p: Pos } | null => {
+    const td = (alvo as HTMLElement).closest('td') as HTMLTableCellElement | null;
+    const tr = td?.parentElement as HTMLTableRowElement | undefined;
+    if (!td || !tr?.dataset.k || td.closest('table') !== ref.current) return null;
+    return { td, p: { r: linhas().indexOf(tr), c: td.cellIndex } };
+  };
+  const retangulo = (a: Pos, b: Pos) => {
+    const ls = linhas(), out = new Set<string>();
+    for (let r = Math.min(a.r, b.r); r <= Math.max(a.r, b.r); r++)
+      for (const td of ls[r]?.cells ?? []) if (td.cellIndex >= Math.min(a.c, b.c) && td.cellIndex <= Math.max(a.c, b.c)) out.add(chave(td));
+    return out;
+  };
+  const onMouseDown = (e: MouseEvent<HTMLTableElement>) => {
+    if (e.button !== 0 || (e.target as HTMLElement).closest('a, button, input')) return;
+    const x = posDe(e.target);
+    if (!x) return;
+    e.preventDefault();  // não seleciona texto ao arrastar
+    const k = chave(x.td);
+    const ctrl = e.ctrlKey || e.metaKey;
+    if (ctrl && sel.has(k)) {  // Ctrl+clique numa célula marcada: desmarca
+      const s2 = new Set(sel); s2.delete(k); setSel(s2); arraste.current = null; return;
+    }
+    if (!ctrl && sel.size === 1 && sel.has(k)) { setSel(new Set()); arraste.current = null; return; }
+    const base = ctrl ? new Set(sel) : new Set<string>();
+    arraste.current = { ini: x.p, base };
+    setSel(new Set([...base, k]));
+  };
+  const onMouseOver = (e: MouseEvent<HTMLTableElement>) => {
+    const a = arraste.current;
+    if (!a || !(e.buttons & 1)) return;
+    const x = posDe(e.target);
+    if (x) setSel(new Set([...a.base, ...retangulo(a.ini, x.p)]));
   };
   useEffect(() => {
+    const fim = () => { arraste.current = null; };
     const esc = (e: KeyboardEvent) => { if (e.key === 'Escape') setSel(new Set()); };
+    window.addEventListener('mouseup', fim);
     window.addEventListener('keydown', esc);
-    return () => window.removeEventListener('keydown', esc);
+    return () => { window.removeEventListener('mouseup', fim); window.removeEventListener('keydown', esc); };
   }, []);
   useLayoutEffect(() => {
     const t = ref.current;
     if (!t) return;
+    t.querySelectorAll('td.selc, td.sel-lin, td.sel-col').forEach((td) => td.classList.remove('selc', 'sel-lin', 'sel-col'));
     let numeros = 0, soma = 0;
-    t.querySelectorAll('td.selc').forEach((td) => td.classList.remove('selc'));
-    t.querySelectorAll<HTMLTableCellElement>('tbody tr[data-k] > td').forEach((td) => {
-      if (!sel.has(chave(td))) return;
-      td.classList.add('selc');
-      const txt = (td.textContent ?? '').trim();
-      if (/^-?[\d.]+(,\d+)?$/.test(txt)) { numeros += 1; soma += Number(txt.replace(/\./g, '').replace(',', '.')); }
-    });
+    const cols = new Set<number>();
+    const ls = linhas();
+    for (const tr of ls) {
+      let linhaSel = false;
+      for (const td of tr.cells) {
+        if (!sel.has(chave(td))) continue;
+        linhaSel = true; cols.add(td.cellIndex); td.classList.add('selc');
+        const txt = (td.textContent ?? '').trim();
+        if (/^-?[\d.]+(,\d+)?$/.test(txt)) { numeros += 1; soma += Number(txt.replace(/\./g, '').replace(',', '.')); }
+      }
+      if (linhaSel) for (const td of tr.cells) td.classList.add('sel-lin');
+    }
+    if (cols.size) for (const tr of ls) for (const td of tr.cells) if (cols.has(td.cellIndex)) td.classList.add('sel-col');
     const novo = sel.size > 1 ? { n: sel.size, numeros, soma } : null;
     setResumo((r) => (JSON.stringify(r) === JSON.stringify(novo) ? r : novo));
   });
-  return { ref, onClick, resumo };
+  return { ref, onMouseDown, onMouseOver, resumo };
 }
 
 function ResumoSelecao({ r }: { r: { n: number; numeros: number; soma: number } | null }) {
@@ -180,7 +216,7 @@ export function Volumes({ saldos, est, varios, tipos, soFalta, mudar }: {
       <section className="panel estoque-painel">
         <div className="tramo-h"><b>RECEBIMENTO POR VOLUME</b><span className="muted">{titulo.toUpperCase()}</span><span className="grow" /><ResumoSelecao r={selecao.resumo} /></div>
         <div className="estoque-tabela">
-          <table className="est vr cruz" {...cruz} ref={selecao.ref} onClick={selecao.onClick}>
+          <table className="est vr cruz" {...cruz} ref={selecao.ref} onMouseDown={selecao.onMouseDown} onMouseOver={(e) => { cruz.onMouseOver(e); selecao.onMouseOver(e); }}>
             <thead>
               <tr>
                 <th rowSpan={2}>Parte - matriz</th><th rowSpan={2}>Parte</th>
@@ -257,7 +293,7 @@ export function Fixadores({ fixadores, varios, soFalta, mudar }: { fixadores: Sa
       <section className="panel estoque-painel">
         <div className="tramo-h"><b>FIXADORES</b><span className="muted num">{lista.length} itens</span><span className="grow" /><ResumoSelecao r={selecao.resumo} /></div>
         <div className="estoque-tabela">
-          <table className="est cruz" {...cruz} ref={selecao.ref} onClick={selecao.onClick}>
+          <table className="est cruz" {...cruz} ref={selecao.ref} onMouseDown={selecao.onMouseDown} onMouseOver={(e) => { cruz.onMouseOver(e); selecao.onMouseOver(e); }}>
             <thead><tr>
               <th className="esq">Seção</th><th className="esq">Fixador</th><th>Previsto</th><th>Recebido</th><th>Saldo</th><th>Atendido</th>
               {varios && <th className="g0">Canteiro</th>}
