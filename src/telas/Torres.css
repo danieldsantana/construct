@@ -63,19 +63,5 @@ main:has(> .torres.cheia) { overflow: hidden; padding-bottom: 12px; display: fle
 .torres-tabela table.lista tbody tr:hover td.vazio { background: #f3f5f9; }
 .torres-tabela table.lista td.g0.vazio { border-left: 2px solid var(--line); }  /* mantém a divisa grossa entre grupos */
 
-/* Mapa contínuo (blocos de 24 como no MAPA ESTRUTURA do controle) */
-.mapa-blocos { padding: 8px 10px 10px; display: grid; gap: 10px; overflow-x: auto; }
-.mapa-bloco { width: auto; table-layout: fixed; }
-.mapa-bloco th { position: static; width: 48px; font-size: 11px; text-transform: none; padding: 2px 6px; background: var(--navy-2); }
-.mapa-bloco td { width: 58px; min-width: 58px; text-align: center; padding: 2px 3px; font-size: 12px; white-space: nowrap; }
-.mapa-bloco tr.h td, .mapa-bloco tr.nn td { color: var(--muted); font-size: 11px; }
-.mapa-bloco tr.tt td { background: var(--navy); color: #fff; font-weight: 700; cursor: pointer; }
-.mapa-bloco tr.tt td:hover { background: var(--navy-2); }
-.mapa-bloco tr.tt td.anc { box-shadow: inset 0 -1px 0 rgba(254,107,0,.35); }
-.mapa-bloco tr.tt td.sel { outline: 3px solid var(--orange); outline-offset: -3px; }
-.mapa-bloco tr.tp td { font-size: 11.5px; }
-.mapa-bloco tr.stt td { cursor: pointer; font-size: 11px; font-weight: 600; }
-.mapa-bloco td.st-ok { background: #bfe6cb; color: #0f5a2c; }
-.mapa-bloco td.st-falta { background: #f6c4bf; color: #8f1d15; }
-.mapa-bloco td.st-sf { background: #fde9b8; color: #6b4a00; }
-.mapa-bloco td.st-sem { background: #fbfbfc; color: var(--muted); }
+/* Mapa contínuo: 24 torres por linha, mesma célula da visão por tramo */
+.mapa-grade { display: grid; grid-template-columns: repeat(24, 60px); gap: 5px; padding: 8px 10px 10px; overflow-x: auto; }
