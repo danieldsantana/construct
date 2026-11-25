@@ -61,3 +61,4 @@ main:has(> .torres.cheia) { overflow: hidden; padding-bottom: 12px; display: fle
 /* célula sem componente: apagada, não chama atenção */
 .torres-tabela table.lista td.vazio { background: #f7f8fa; border-color: #eef0f3; }
 .torres-tabela table.lista tbody tr:hover td.vazio { background: #eef1f6; }
+.torres-tabela table.lista td.g0.vazio { border-left: 2px solid var(--line); }  /* mantém a divisa grossa entre grupos */
