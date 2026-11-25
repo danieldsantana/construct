@@ -4,7 +4,7 @@ import { COMPOSICAO, formatarMetros, statusDaTorre, useLinhas, useStatusAuto, us
 import { useEscopo } from '../lib/escopo';
 import { num } from '../lib/formato';
 import { Titulo } from '../componentes/Titulo';
-import { ResumoSelecao, useColunaSobMouse, useSelecao } from '../componentes/TabelaCruz';
+import { useColunaSobMouse, useSelecao } from '../componentes/TabelaCruz';
 import { Gaveta } from '../componentes/Gaveta';
 import './Torres.css';
 
@@ -160,7 +160,7 @@ export function Lista({ torres, cores, completas, ordem, selId, abrir, escolherT
     return [...m];
   }, [torres, ordem]);
   const cruz = useColunaSobMouse();
-  const selecao = useSelecao();
+  const selecao = useSelecao({ multipla: false });  // na Lista: só uma célula (sem arrastar/Ctrl)
   if (!torres.length) return <p className="muted">Nenhuma torre neste recorte.</p>;
   const comp = COMPOSICAO.filter((g) => torres.some((t) => t.categoria === (g.grupo === 'AUTOPORTANTE' ? 'autoportante' : 'estaiada')));
   const varios = grupos.length > 1;
@@ -176,7 +176,6 @@ export function Lista({ torres, cores, completas, ordem, selId, abrir, escolherT
         <b>{titulo.toUpperCase()}</b>
         <span className="muted num">{torres.length} torres</span>
         <span className="grow" />
-        <ResumoSelecao r={selecao.resumo} />
         {abas.length > 0 && <span className="muted" style={{ fontSize: 12 }}>{abas.join(' · ')}</span>}
       </div>
       <div className="torres-tabela">

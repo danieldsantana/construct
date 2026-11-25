@@ -18,7 +18,7 @@ export function useColunaSobMouse() {
 // Esc limpa. A célula é identificada pela linha (data-k no <tr>) + índice da coluna; a marcação (célula + sombra leve
 // na linha e na coluna, como o destaque do mouse) é aplicada no DOM após cada render.
 type Pos = { r: number; c: number };
-export function useSelecao() {
+export function useSelecao({ multipla = true }: { multipla?: boolean } = {}) {
   const ref = useRef<HTMLTableElement>(null);
   const [sel, setSel] = useState<Set<string>>(new Set());
   const [resumo, setResumo] = useState<{ n: number; numeros: number; soma: number } | null>(null);
@@ -43,13 +43,13 @@ export function useSelecao() {
     if (!x) return;
     e.preventDefault();  // não seleciona texto ao arrastar
     const k = chave(x.td);
-    const ctrl = e.ctrlKey || e.metaKey;
+    const ctrl = multipla && (e.ctrlKey || e.metaKey);  // sem seleção múltipla: Ctrl é ignorado
     if (ctrl && sel.has(k)) {  // Ctrl+clique numa célula marcada: desmarca
       const s2 = new Set(sel); s2.delete(k); setSel(s2); arraste.current = null; return;
     }
     if (!ctrl && sel.size === 1 && sel.has(k)) { setSel(new Set()); arraste.current = null; return; }
     const base = ctrl ? new Set(sel) : new Set<string>();
-    arraste.current = { ini: x.p, base };
+    arraste.current = multipla ? { ini: x.p, base } : null;  // arrastar só com seleção múltipla
     setSel(new Set([...base, k]));
   };
   const onMouseOver = (e: MouseEvent<HTMLTableElement>) => {
