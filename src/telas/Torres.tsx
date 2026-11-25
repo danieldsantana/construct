@@ -139,7 +139,7 @@ export function Lista({ torres, ordem, selId, abrir, escolherTramo }: {
               <b>{nome.toUpperCase()}</b>
               <span className="muted num">{ts.length} torres</span>
               <span className="grow" />
-              {fonte && <span className="muted" style={{ fontSize: 12 }}>{fonte.replace(/^controle:/, '')}</span>}
+              {fonte && <span className="muted" style={{ fontSize: 12 }}>{abaDaFonte(fonte)}</span>}
             </div>
             <div className="torres-tabela">
               <table className="lista">
@@ -261,11 +261,16 @@ export function FichaTorre({ t, aoFechar }: { t: Torre | null; aoFechar: () => v
                 </tbody>
               </table>
             ) : <p className="muted">Controle deste canteiro ainda não importado.</p>}
-            {t.fonte && <p className="muted" style={{ fontSize: 12, margin: '6px 0 0' }}>Fonte: {t.fonte.replace(/^controle:/, '')}</p>}
+            {t.fonte && <p className="muted" style={{ fontSize: 12, margin: '6px 0 0' }}>Fonte: aba {abaDaFonte(t.fonte)} do controle</p>}
           </section>
           <div className="callout">O que falta para esta torre (por volume) entra quando definirmos juntos as regras de situação.</div>
         </>
       )}
     </Gaveta>
   );
+}
+
+// 'controle:1 - Controle de estruturas - Juazeiro.xlsx · LISTA - JUAZEIRO' -> 'LISTA - JUAZEIRO' (sem o nome do arquivo)
+function abaDaFonte(fonte: string) {
+  return fonte.split(' · ').pop() ?? fonte;
 }
