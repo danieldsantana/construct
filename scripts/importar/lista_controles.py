@@ -44,13 +44,22 @@ def ler(arq: Path):
         seq = r[28 + d] if isinstance(r[28 + d], (int, float)) else None
         torres.append({"num": num, "tipo": r[2 + d], "status": str(r[5 + d] or "").strip(), "seq": int(seq) if seq is not None else None, "comp": comp})
     aba_t = next(n for n in wb.sheetnames if n.upper().startswith("TABELAS"))
-    total_entregue = None
-    for r in wb[aba_t].iter_rows(min_row=1, max_row=20, values_only=True):
-        if len(r) > 3 and str(r[1] or "").strip().upper().startswith("TOTAL"):
+    total_entregue, tabela, dentro = None, [], False
+    inteiro = lambda v: int(v) if isinstance(v, (int, float)) else None  # noqa: E731
+    for r in wb[aba_t].iter_rows(min_row=1, max_row=30, values_only=True):
+        r = list(r) + [None] * 12
+        rot = str(r[1] or "").strip().upper()
+        if rot.startswith("TOTAL"):
             total_entregue = r[3]
             break
+        if rot == "TORRE":  # cabeçalho do bloco 1 (B=TORRE C=PREVISTO D=COMPLETAS F=SEM FIX. H=SEM ESTR. J=PENDÊNCIA)
+            dentro = True
+            continue
+        if dentro and rot:
+            tabela.append({"tipo": rot, "previsto": inteiro(r[2]), "completas": inteiro(r[3]), "sem_fix": inteiro(r[5]),
+                           "sem_estr": inteiro(r[7]), "pend": inteiro(r[9])})
     wb.close()
-    return aba, torres, total_entregue
+    return aba, torres, total_entregue, tabela
 
 
 def main() -> int:
@@ -60,7 +69,7 @@ def main() -> int:
     conn = conectar()
     ok = True
     for arq, linha, canteiro in CONTROLES:
-        aba, torres, total = ler(DADOS / arq)
+        aba, torres, total, tabela = ler(DADOS / arq)
         entregues = sum(1 for t in torres if sem_acento(t["status"]) == "ENTREGUE")
         difs = []
         with conn.cursor() as cur:
@@ -79,6 +88,14 @@ def main() -> int:
                 aviso = f"aviso: LISTA × faixa oficial do canteiro — só na LISTA {sorted(lista - faixa)[:8]} · só na faixa {sorted(faixa - lista)[:8]}"
             if total is not None and entregues != total:
                 difs.append(f"Entregue na LISTA = {entregues} × TOTAL da TABELAS = {total}")
+            # TABELAS por tipo × LISTA: previsto = torres do tipo; completas = Entregue do tipo
+            for tb in tabela:
+                n_tipo = sum(1 for t in torres if str(t["tipo"]).strip().upper() == tb["tipo"])
+                ent_tipo = sum(1 for t in torres if str(t["tipo"]).strip().upper() == tb["tipo"] and sem_acento(t["status"]) == "ENTREGUE")
+                if (tb["previsto"], tb["completas"]) != (n_tipo, ent_tipo):
+                    difs.append(f"TABELAS {tb['tipo']}: previsto {tb['previsto']} / completas {tb['completas']} × LISTA {n_tipo} / {ent_tipo}")
+            if not tabela:
+                difs.append("bloco por tipo da TABELAS não encontrado")
             print(f"{linha} · {canteiro} ({aba}): {len(torres)} torres · {entregues} Entregue (TABELAS: {total}) · "
                   f"status {sorted({t['status'] for t in torres})} → {'CONFERE' if not difs else 'DIVERGE'}")
             for d in difs + ([aviso] if aviso else []):
@@ -91,6 +108,13 @@ def main() -> int:
                                    on conflict (torre_id) do update set status = excluded.status, sequencia = excluded.sequencia,
                                      composicao = excluded.composicao, fonte = excluded.fonte, canteiro_id = excluded.canteiro_id""",
                            [(ids[t["num"]], t["status"], t["seq"], json.dumps(t["comp"]), f"controle:{Path(arq).name} · {aba}", cid) for t in torres])
+            cur.execute("select id from public.linha where sigla = %s", (linha,))
+            lid = cur.fetchone()[0]
+            cur.execute("delete from public.tabela_controle where linha_id = %s and canteiro_id = %s", (lid, cid))
+            execute_values(cur, """insert into public.tabela_controle (linha_id, canteiro_id, tipo, previsto, completas, sem_fixadores,
+                                     sem_estrutura, com_pendencia, fonte) values %s""",
+                           [(lid, cid, tb["tipo"], tb["previsto"], tb["completas"], tb["sem_fix"], tb["sem_estr"], tb["pend"],
+                             f"controle:{Path(arq).name} · {next(iter([aba]))} / TABELAS") for tb in tabela])
         conn.commit()
     if a.simular:
         print("Simulação: nada foi gravado.")

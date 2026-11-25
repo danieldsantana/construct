@@ -1,4 +1,5 @@
-import { useCallback, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useSearchParams } from 'react-router';
 import { Abas, Titulo } from '../componentes/Titulo';
 import { Gaveta } from '../componentes/Gaveta';
 import { useEscopo } from '../lib/escopo';
@@ -9,7 +10,8 @@ import {
 } from '../dados/recebimento';
 
 type Vista = 'lista' | 'planilha';
-type Filtro = 'todas' | 'nao_recebida' | 'recebidas' | 'reposicao' | 'sem_controle' | 'outros';
+type Filtro = 'todas' | 'nao_recebida' | 'recebidas' | 'em_conferencia' | 'reposicao' | 'sem_controle' | 'outros';
+const FILTROS: Filtro[] = ['todas', 'nao_recebida', 'recebidas', 'em_conferencia', 'reposicao', 'sem_controle', 'outros'];
 type Linha =
   | { k: 'nf'; id: string; nf: NotaFiscal; quando: string }
   | { k: 'mov'; id: string; mov: Recebimento; quando: string };
@@ -30,8 +32,16 @@ export function Notas() {
   const nfs = useNotasFiscais();
   const rec = useRecebimentos();
   const [vista, setVista] = useState<Vista>('lista');
-  const [filtro, setFiltro] = useState<Filtro>('todas');
+  const [params] = useSearchParams();  // ?filtro=nao_recebida&nf=<id> (links da tela Início)
+  const [filtro, setFiltro] = useState<Filtro>(() => {
+    const f = params.get('filtro') as Filtro | null;
+    return f && FILTROS.includes(f) ? f : 'todas';
+  });
   const [abertaNF, setAbertaNF] = useState<NotaFiscal | null>(null);
+  const nfParam = Number(params.get('nf')) || null;
+  useEffect(() => {
+    if (nfParam && nfs.dados.length) setAbertaNF(nfs.dados.find((n) => n.id === nfParam) ?? null);
+  }, [nfParam, nfs.dados]);
   const [abertoMov, setAbertoMov] = useState<Recebimento | null>(null);
   const fechar = useCallback(() => { setAbertaNF(null); setAbertoMov(null); }, []);
 
@@ -65,7 +75,7 @@ export function Notas() {
   if (carregando) return <><Titulo texto="Notas fiscais" /><p className="muted">Carregando…</p></>;
   if (erro) return <><Titulo texto="Notas fiscais" /><p className="warn">Não foi possível carregar: {erro}</p></>;
 
-  const filtros: [Filtro, string][] = [['todas', 'Todas'], ['nao_recebida', 'Não recebidas'], ['recebidas', 'Recebidas'], ['reposicao', 'Reposições (SAC)'], ['sem_controle', 'Sem controle importado'], ['outros', 'Transferências e ajustes']];
+  const filtros: [Filtro, string][] = [['todas', 'Todas'], ['nao_recebida', 'Não recebidas'], ['recebidas', 'Recebidas'], ['em_conferencia', 'Em conferência'], ['reposicao', 'Reposições (SAC)'], ['sem_controle', 'Sem controle importado'], ['outros', 'Transferências e ajustes']];
 
   return (
     <>
