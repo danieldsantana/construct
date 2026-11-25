@@ -170,9 +170,10 @@ export function Lista({ torres, cores, completas, ordem, selId, abrir, escolherT
         <table className="lista">
           <thead>
             <tr>
-              <th rowSpan={2} className="r">Seq.</th><th rowSpan={2}>Torre</th>{varios && <th rowSpan={2}>Canteiro</th>}<th rowSpan={2}>Tipo</th>
+              <th rowSpan={2} className="r">Seq.</th><th rowSpan={2}>Torre</th><th rowSpan={2}>Tipo</th>
               <th rowSpan={2} className="r">Altura (m)</th><th rowSpan={2} className="r">Tramo</th><th rowSpan={2}>Status</th>
               {comp.map((g) => <th key={g.grupo} colSpan={g.colunas.length} className="grp">{g.grupo}</th>)}
+              {varios && <th rowSpan={2} className="g0">Canteiro</th>}
             </tr>
             <tr>{comp.flatMap((g) => g.colunas.map((c, ci) => <th key={c.chave} className={`r sub ${ci === 0 ? 'g0' : ''}`}>{c.rotulo}</th>))}</tr>
           </thead>
@@ -182,7 +183,6 @@ export function Lista({ torres, cores, completas, ordem, selId, abrir, escolherT
                   onClick={() => abrir(t.id)} title={varios && i === 0 ? nome : undefined}>
                 <td className="r num">{t.sequencia ?? ''}</td>
                 <td className="tnum">{t.numero}</td>
-                {varios && <td className="cant">{t.canteiro}</td>}
                 <td className="tipo">{t.tipo}{t.ancoragem && <span className="marca" title={t.arranjo_ferragens ?? ''}>anc.</span>}</td>
                 <td className="r num">{formatarMetros(t.altura_util)}</td>
                 <td className="r num">
@@ -190,6 +190,7 @@ export function Lista({ torres, cores, completas, ordem, selId, abrir, escolherT
                 </td>
                 <td><Status t={t} /></td>
                 {comp.flatMap((g) => g.colunas.map((c, ci) => <td key={c.chave} className={`r num comp ${ci === 0 ? 'g0' : ''} ${valorComp(t, c.chave, c.metros) ? classeCor(cores.get(`${t.id}|${c.chave}`)) : 'vazio'}`}>{valorComp(t, c.chave, c.metros)}</td>))}
+                {varios && <td className="cant g0">{t.canteiro}</td>}
               </tr>
             )))}
           </tbody>
