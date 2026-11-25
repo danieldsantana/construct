@@ -3,19 +3,19 @@ import { useSearchParams } from 'react-router';
 import { COMPOSICAO, formatarMetros, statusDaTorre, useTorres, type ClasseStatus, type Torre } from '../dados/torres';
 import { useEscopo } from '../lib/escopo';
 import { num } from '../lib/formato';
-import { Abas, Titulo } from '../componentes/Titulo';
+import { Titulo } from '../componentes/Titulo';
 import { Gaveta } from '../componentes/Gaveta';
 import './Torres.css';
 
-type Aba = 'lista' | 'mapa';
+export type Aba = 'lista' | 'mapa';
 
-// Torres = aba LISTA de cada controle (status digitado, composição e sequência de ataque) sobre a LC.
+// Lista e Mapa = abas LISTA e MAPA ESTRUTURA de cada controle (status digitado, composição e sequência de ataque) sobre a LC.
+// São dois menus separados (como no controle); filtros, busca e ficha são os mesmos.
 // Nada é calculado aqui: o status é o do controle. Linha e canteiro vêm do escopo; o resto fica na URL.
-export function Torres() {
+export function Torres({ aba }: { aba: Aba }) {
   const { torres, carregando, erro } = useTorres();
   const { inclui } = useEscopo();
   const [params, setParams] = useSearchParams();
-  const aba = (params.get('aba') === 'mapa' ? 'mapa' : 'lista') as Aba;
   const tipos = (params.get('tipos') ?? '').split(',').filter(Boolean);
   const busca = params.get('q') ?? '';
   const tramo = params.get('tramo') ?? '';
@@ -44,15 +44,15 @@ export function Torres() {
   }, [doRecorte, tipos, st, busca, tramo]);
   const sel = selId ? torres.find((t) => t.id === selId) ?? null : null;
 
-  if (carregando) return <><Titulo texto="Torres" /><p className="muted">Carregando torres…</p></>;
-  if (erro) return <><Titulo texto="Torres" /><p className="warn">Não foi possível carregar as torres: {erro}</p></>;
+  const titulo = aba === 'lista' ? 'Lista' : 'Mapa de estruturas';
+  if (carregando) return <><Titulo texto={titulo} /><p className="muted">Carregando torres…</p></>;
+  if (erro) return <><Titulo texto={titulo} /><p className="warn">Não foi possível carregar as torres: {erro}</p></>;
 
   const semControle = doRecorte.filter((t) => t.status === null).length;
 
   return (
     <div className="torres">
-      <Titulo texto="Torres"><span className="num">{visiveis.length} de {doRecorte.length}</span></Titulo>
-      <Abas<Aba> abas={[['lista', 'Lista'], ['mapa', 'Mapa por tramo']]} atual={aba} aoMudar={(a) => mudar('aba', a === 'lista' ? '' : a)} />
+      <Titulo texto={titulo}><span className="num">{visiveis.length} de {doRecorte.length} torres</span></Titulo>
 
       <div className="toolbar">
         <input type="search" aria-label="Buscar torre" placeholder="Buscar torre (ex. 8/2)" value={busca}

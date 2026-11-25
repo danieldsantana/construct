@@ -1,4 +1,4 @@
-import { createHashRouter } from 'react-router';
+import { createHashRouter, Navigate } from 'react-router';
 import { Moldura } from './telas/Moldura';
 import { Inicio } from './telas/Inicio';
 import { Torres } from './telas/Torres';
@@ -14,7 +14,9 @@ export const roteador = createHashRouter([
     element: <Moldura />,
     children: [
       { index: true, element: <Inicio /> },
-      { path: 'torres', element: <Torres /> },
+      { path: 'lista', element: <Torres aba="lista" key="lista" /> },
+      { path: 'mapa', element: <Torres aba="mapa" key="mapa" /> },
+      { path: 'torres', element: <Navigate to="/lista" replace /> },  // endereço antigo
       { path: 'notas', element: <Notas /> },
       { path: 'estoque', element: <Estoque /> },
       { path: 'ofs', element: <OFs /> },

@@ -105,7 +105,7 @@ export function Inicio() {
               <tr key={t}><td>{t}</td><td className="r num">{a.prev}</td><td className="r num">{a.comp}</td><td><Porcentagem valor={a.prev ? a.comp / a.prev : 0} ok={a.comp >= a.prev} /></td></tr>
             ))}</tbody>
           </table>
-          <div className="foot"><Link to="/torres?aba=mapa">Ver mapa de torres</Link> <span className="muted">· origem: TABELAS (confere com a LISTA)</span></div>
+          <div className="foot"><Link to="/mapa">Ver mapa de estruturas</Link> <span className="muted">· origem: TABELAS (confere com a LISTA)</span></div>
         </div>
 
         <div className="card">

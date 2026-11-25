@@ -6,7 +6,8 @@ import { Entrar } from './Entrar';
 
 const MENUS: [string, string][] = [
   ['/', 'Início'],
-  ['/torres', 'Torres'],
+  ['/lista', 'Lista'],
+  ['/mapa', 'Mapa'],
   ['/notas', 'Notas fiscais'],
   ['/estoque', 'Estoque'],
   ['/ofs', 'OFs'],
