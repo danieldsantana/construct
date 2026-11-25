@@ -32,3 +32,6 @@
 
 /* Lista: valores centralizados */
 .torres-tabela table.lista td, .torres-tabela table.lista th { text-align: center; }
+/* divisa entre canteiros na Lista: só um tom acima da grade */
+.torres-tabela table.lista tr.divisa td { border-top: 1px solid var(--line); }
+.torres-tabela table.lista td.cant { font-size: 12px; color: var(--muted); }

@@ -117,7 +117,8 @@ function valorComp(t: Torre, chave: string, metros?: boolean) {
   return metros ? formatarMetros(v) : num(v);
 }
 
-// Uma tabela por canteiro, como a aba LISTA - <canteiro>; só mostra o grupo de composição que existe no recorte.
+// Uma tabela só (como a aba LISTA), com todos os canteiros do escopo em sequência; na divisa entre canteiros, uma
+// linha levemente mais escura. Só mostra o grupo de composição (AUTOPORTANTE/ESTAIADA) que existe no recorte.
 export function Lista({ torres, ordem, selId, abrir, escolherTramo }: {
   torres: Torre[]; ordem: 'torre' | 'seq'; selId: number | null; abrir: (id: number) => void; escolherTramo: (t: Torre) => void;
 }) {
@@ -128,50 +129,49 @@ export function Lista({ torres, ordem, selId, abrir, escolherTramo }: {
     return [...m];
   }, [torres, ordem]);
   if (!torres.length) return <p className="muted">Nenhuma torre neste recorte.</p>;
+  const comp = COMPOSICAO.filter((g) => torres.some((t) => t.categoria === (g.grupo === 'AUTOPORTANTE' ? 'autoportante' : 'estaiada')));
+  const varios = grupos.length > 1;
+  const linhas = [...new Set(grupos.map(([, ts]) => ts[0].linha_sigla))];
+  const titulo = linhas.map((l) => `${l} · ${grupos.filter(([, ts]) => ts[0].linha_sigla === l).map(([, ts]) => ts[0].canteiro).join(' + ')}`).join(' | ');
+  const abas = [...new Set(grupos.map(([, ts]) => ts.find((t) => t.fonte)?.fonte).filter((f): f is string => !!f).map(abaDaFonte))];
   return (
-    <>
-      {grupos.map(([nome, ts]) => {
-        const comp = COMPOSICAO.filter((g) => ts.some((t) => t.categoria === (g.grupo === 'AUTOPORTANTE' ? 'autoportante' : 'estaiada')));
-        const fonte = ts.find((t) => t.fonte)?.fonte;
-        return (
-          <section key={nome} className="panel" style={{ marginBottom: 12 }}>
-            <div className="tramo-h">
-              <b>{nome.toUpperCase()}</b>
-              <span className="muted num">{ts.length} torres</span>
-              <span className="grow" />
-              {fonte && <span className="muted" style={{ fontSize: 12 }}>{abaDaFonte(fonte)}</span>}
-            </div>
-            <div className="torres-tabela">
-              <table className="lista">
-                <thead>
-                  <tr>
-                    <th rowSpan={2} className="r">Seq.</th><th rowSpan={2}>Torre</th><th rowSpan={2}>Tipo</th>
-                    <th rowSpan={2} className="r">Altura (m)</th><th rowSpan={2} className="r">Tramo</th><th rowSpan={2}>Status</th>
-                    {comp.map((g) => <th key={g.grupo} colSpan={g.colunas.length} className="grp">{g.grupo}</th>)}
-                  </tr>
-                  <tr>{comp.flatMap((g) => g.colunas.map((c) => <th key={c.chave} className="r sub">{c.rotulo}</th>))}</tr>
-                </thead>
-                <tbody>
-                  {ts.map((t) => (
-                    <tr key={t.id} className={`${t.ancoragem ? 'ancoragem' : ''} ${t.id === selId ? 'sel' : ''}`} onClick={() => abrir(t.id)}>
-                      <td className="r num">{t.sequencia ?? ''}</td>
-                      <td className="tnum">{t.numero}</td>
-                      <td>{t.tipo}{t.ancoragem && <span className="marca" title={t.arranjo_ferragens ?? ''}>anc.</span>}</td>
-                      <td className="r num">{formatarMetros(t.altura_util)}</td>
-                      <td className="r num">
-                        <button className="tramo" onClick={(e) => { e.stopPropagation(); escolherTramo(t); }} title="Ver só este tramo">{t.tramo}</button>
-                      </td>
-                      <td><Status t={t} /></td>
-                      {comp.flatMap((g) => g.colunas.map((c) => <td key={c.chave} className="r num comp">{valorComp(t, c.chave, c.metros)}</td>))}
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          </section>
-        );
-      })}
-    </>
+    <section className="panel" style={{ marginBottom: 12 }}>
+      <div className="tramo-h">
+        <b>{titulo.toUpperCase()}</b>
+        <span className="muted num">{torres.length} torres</span>
+        <span className="grow" />
+        {abas.length > 0 && <span className="muted" style={{ fontSize: 12 }}>{abas.join(' · ')}</span>}
+      </div>
+      <div className="torres-tabela">
+        <table className="lista">
+          <thead>
+            <tr>
+              <th rowSpan={2} className="r">Seq.</th><th rowSpan={2}>Torre</th>{varios && <th rowSpan={2}>Canteiro</th>}<th rowSpan={2}>Tipo</th>
+              <th rowSpan={2} className="r">Altura (m)</th><th rowSpan={2} className="r">Tramo</th><th rowSpan={2}>Status</th>
+              {comp.map((g) => <th key={g.grupo} colSpan={g.colunas.length} className="grp">{g.grupo}</th>)}
+            </tr>
+            <tr>{comp.flatMap((g) => g.colunas.map((c) => <th key={c.chave} className="r sub">{c.rotulo}</th>))}</tr>
+          </thead>
+          <tbody>
+            {grupos.flatMap(([nome, ts], gi) => ts.map((t, i) => (
+              <tr key={t.id} className={`${t.ancoragem ? 'ancoragem' : ''} ${t.id === selId ? 'sel' : ''} ${gi > 0 && i === 0 ? 'divisa' : ''}`}
+                  onClick={() => abrir(t.id)} title={varios && i === 0 ? nome : undefined}>
+                <td className="r num">{t.sequencia ?? ''}</td>
+                <td className="tnum">{t.numero}</td>
+                {varios && <td className="cant">{t.canteiro}</td>}
+                <td>{t.tipo}{t.ancoragem && <span className="marca" title={t.arranjo_ferragens ?? ''}>anc.</span>}</td>
+                <td className="r num">{formatarMetros(t.altura_util)}</td>
+                <td className="r num">
+                  <button className="tramo" onClick={(e) => { e.stopPropagation(); escolherTramo(t); }} title="Ver só este tramo">{t.tramo}</button>
+                </td>
+                <td><Status t={t} /></td>
+                {comp.flatMap((g) => g.colunas.map((c) => <td key={c.chave} className="r num comp">{valorComp(t, c.chave, c.metros)}</td>))}
+              </tr>
+            )))}
+          </tbody>
+        </table>
+      </div>
+    </section>
   );
 }
 
