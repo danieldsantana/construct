@@ -55,7 +55,8 @@ table.est.vr tr.faixa td { background: #e8eef7; border-color: #d5dfec; padding: 
 .faixa-c .muted { font-size: 12px; }
 .faixa-c .pctx { font-weight: 700; min-width: 40px; text-align: right; }
 table.est.vr td.parte { color: var(--muted); font-size: 12px; }
-table.est.vr tr.ini-parte > td { border-top: 1px solid var(--line); }
+/* divisa entre partes (componentes), um pouco mais escura que a grade, como no controle */
+table.est.vr tr.ini-parte > td { border-top: 1px solid #98a3b3; }
 table.est.vr td.conj { font-size: 15px; font-weight: 700; vertical-align: middle; background: #f6f8fb; color: var(--navy); }
 table.est.vr td.rec-ok { background: #eaf6ee; }
 table.est.vr td.rec-parc { background: #fdf6e3; }
