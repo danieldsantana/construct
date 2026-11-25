@@ -150,7 +150,9 @@ function Status({ t }: { t: Torre }) {
   return <span className={`st ${CLASSE_PILL[s.classe]}`}>{s.texto}</span>;
 }
 
+// Só vale a coluna do grupo da torre (AP_* em autoportante, ES_* em estaiada); valores da planilha no outro grupo são ignorados.
 function valorComp(t: Torre, chave: string, metros?: boolean) {
+  if (!chave.startsWith(t.categoria === 'autoportante' ? 'AP_' : 'ES_')) return '';
   const v = t.composicao?.[chave];
   if (v === undefined || v === null) return '';
   return metros ? formatarMetros(v) : num(v);
