@@ -1,5 +1,5 @@
 import { useMemo } from 'react';
-import { Link, useSearchParams } from 'react-router';
+import { useSearchParams } from 'react-router';
 import { Abas, Porcentagem, Titulo } from '../componentes/Titulo';
 import { useEscopo } from '../lib/escopo';
 import { num } from '../lib/formato';
@@ -92,7 +92,7 @@ export function Volumes({ saldos, est, varios, tipos, soFalta, mudar }: {
           <table className="est vr">
             <thead>
               <tr>
-                <th rowSpan={2}>Torre</th><th rowSpan={2} className="esq">Parte - matriz</th><th rowSpan={2} className="esq">Parte</th>
+                <th rowSpan={2} className="esq">Parte - matriz</th><th rowSpan={2} className="esq">Parte</th>
                 <th colSpan={3} className="g0">Previsto</th><th colSpan={2} className="g0">Recebido</th><th rowSpan={2} className="g0">Conjunto completo</th>
               </tr>
               <tr className="sub"><th className="g0">Quant.</th><th>Peso unit.</th><th>Peso total</th><th className="g0">Quant.</th><th>Peso</th></tr>
@@ -111,28 +111,29 @@ export function Volumes({ saldos, est, varios, tipos, soFalta, mudar }: {
                 const pesoRec = g.volumes.reduce((s, v) => s + n(v.recebido) * n(v.peso_unit), 0);
                 return [
                   <tr key={`h${g.chave}`} className="faixa">
-                    <td colSpan={3} className="esq">ESTRUTURA METÁLICA {g.tipo}{varios ? ` · ${g.linha} ${g.canteiro.toUpperCase()}` : ''}</td>
-                    <td colSpan={2} className="g0 dir">PESO PREVISTO Kg:</td><td>{num(pesoPrev, 2)}</td>
-                    <td className="g0 dir">PESO RECEBIDO Kg:</td><td>{num(pesoRec, 2)}</td><td className="g0" />
+                    <td colSpan={8}>
+                      <div className="faixa-c">
+                        <b>ESTRUTURA METÁLICA {g.tipo}</b>{varios && <span className="muted">{g.linha} · {g.canteiro}</span>}
+                        <span className="grow" />
+                        <span>Peso previsto <b>{num(pesoPrev, 2)}</b> kg</span>
+                        <span>Peso recebido <b>{num(pesoRec, 2)}</b> kg</span>
+                        <span className="pctx">{num(pesoPrev ? (pesoRec / pesoPrev) * 100 : 0)}%</span>
+                      </div>
+                    </td>
                   </tr>,
                   ...mostrar.flatMap(([parte, vs]) => {
                     const e = cc(g, parte);
                     const conj = n(e?.conjunto);
-                    const prev = n(e?.previsto ?? vs[0].previsto);
-                    const dica = e?.torres ? `Atende ${e.atendidas} de ${e.torres} torres na sequência de ataque` + (e.proxima_torre ? ` · próxima: ${e.proxima_torre} (seq. ${e.proxima_seq ?? '—'})` : '') : '';
+                                    const dica = e?.torres ? `Atende ${e.atendidas} de ${e.torres} torres na sequência de ataque` + (e.proxima_torre ? ` · próxima: ${e.proxima_torre} (seq. ${e.proxima_seq ?? '—'})` : '') : '';
                     return vs.map((v, i) => (
                       <tr key={v.material_id} className={i === 0 ? 'ini-parte' : ''}>
-                        <td className="tor">{g.tipo}</td>
                         <td className="esq">{v.descricao}</td>
                         <td className="esq parte">{parte}</td>
                         <td className="g0">{num(v.previsto)}</td><td>{num(v.peso_unit, 2)}</td><td>{num(n(v.previsto) * n(v.peso_unit), 2)}</td>
                         <td className={`g0 ${n(v.recebido) >= n(v.previsto) ? 'rec-ok' : n(v.recebido) > 0 ? 'rec-parc' : ''}`}>{n(v.recebido) ? num(v.recebido) : '-'}</td>
                         <td>{n(v.recebido) ? num(n(v.recebido) * n(v.peso_unit), 2) : '-'}</td>
                         {i === 0 && (
-                          <td rowSpan={vs.length} className={`g0 conj ${conj >= prev ? 'pint-ok' : ''}`} title={dica}>
-                            {num(conj)}
-                            {e?.proxima_torre && <Link className="prox" to={`/lista?q=${encodeURIComponent(e.proxima_torre)}`}>próx. {e.proxima_torre}</Link>}
-                          </td>
+                          <td rowSpan={vs.length} className="g0 conj" title={dica}>{num(conj)}</td>
                         )}
                       </tr>
                     ));

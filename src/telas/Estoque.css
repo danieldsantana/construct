@@ -45,15 +45,17 @@ table.est tr.parte:hover > td.pint-falta { background: #efaea7; }
   .estoque-tabela { max-height: 70vh; }
 }
 
-/* VOLUMES RECEBIDOS (layout do controle) */
+/* VOLUMES RECEBIDOS (layout do controle, visual leve) */
 table.est.vr thead tr.sub th { top: 27px; font-size: 11px; }
-table.est.vr td { padding: 2px 8px; font-size: 12.5px; }
-table.est.vr tr.faixa td { background: var(--navy-2); color: #fff; font-weight: 700; font-size: 12px; border-color: var(--navy-2); }
-table.est.vr tr.faixa td.dir { text-align: right; font-weight: 400; opacity: .9; }
-table.est.vr td.tor, table.est.vr td.parte { color: var(--muted); font-size: 12px; }
+table.est.vr td { padding: 3px 8px; font-size: 12.5px; }
+table.est.vr tr.faixa td { background: #e8eef7; border-color: #d5dfec; padding: 5px 10px; }
+.faixa-c { display: flex; align-items: baseline; gap: 16px; color: var(--navy); font-size: 12.5px; }
+.faixa-c b { font-weight: 700; }
+.faixa-c .grow { flex: 1; }
+.faixa-c .muted { font-size: 12px; }
+.faixa-c .pctx { font-weight: 700; min-width: 40px; text-align: right; }
+table.est.vr td.parte { color: var(--muted); font-size: 12px; }
 table.est.vr tr.ini-parte > td { border-top: 1px solid var(--line); }
-table.est.vr td.conj { font-size: 17px; font-weight: 700; vertical-align: middle; background: #f3f6fb; }
-table.est.vr td.conj.pint-ok { background: #bfe6cb; }
-table.est.vr td.conj .prox { display: block; font-size: 11px; font-weight: 400; margin-top: 2px; }
-table.est.vr td.rec-ok { background: #e2f3e7; }
-table.est.vr td.rec-parc { background: #fdf3d8; }
+table.est.vr td.conj { font-size: 15px; font-weight: 700; vertical-align: middle; background: #f6f8fb; color: var(--navy); }
+table.est.vr td.rec-ok { background: #eaf6ee; }
+table.est.vr td.rec-parc { background: #fdf6e3; }
