@@ -17,7 +17,9 @@
 .torres-tabela th.sub { font-size: 11px; text-transform: none; }
 .torres-tabela td.tnum { background: var(--navy); color: #fff; font-weight: 700; text-align: center; min-width: 54px; }
 .torres-tabela td.comp { color: var(--muted); }
-.torres-tabela .marca { margin-left: 6px; font-size: 10.5px; color: var(--muted); opacity: .6; }
+/* 'anc.' no canto direito da célula, sem deslocar o tipo centralizado */
+.torres-tabela td.tipo { position: relative; padding-left: 26px; padding-right: 26px; }
+.torres-tabela .marca { position: absolute; right: 5px; top: 50%; transform: translateY(-50%); font-size: 10px; color: var(--muted); opacity: .6; }
 .torres-tabela button.tramo { padding: 0 6px; border-color: transparent; background: transparent; }
 .torres-tabela button.tramo:hover { border-color: var(--line); background: var(--panel); }
 .drawer .ref, .torres-tabela .ref { text-decoration: underline; text-underline-offset: 3px; }

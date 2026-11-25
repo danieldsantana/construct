@@ -73,3 +73,6 @@ export const COMPOSICAO: { grupo: 'AUTOPORTANTE' | 'ESTAIADA'; colunas: ColunaCo
 export function formatarMetros(v: number | null) {
   return v === null ? '—' : Number(v).toLocaleString('pt-BR', { minimumFractionDigits: 1, maximumFractionDigits: 1 });
 }
+
+// Linhas com o código usado nos documentos (T4 = JZTIII-CAFII, T3 = CAFII-BRRII)
+export const useLinhas = () => useTabela<{ sigla: string; codigo: string }>('linha', 'sigla, codigo', ['sigla']);

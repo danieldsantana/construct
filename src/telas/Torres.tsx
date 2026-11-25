@@ -1,6 +1,6 @@
 import { useMemo } from 'react';
 import { useSearchParams } from 'react-router';
-import { COMPOSICAO, formatarMetros, statusDaTorre, useTorres, type ClasseStatus, type Torre } from '../dados/torres';
+import { COMPOSICAO, formatarMetros, statusDaTorre, useLinhas, useTorres, type ClasseStatus, type Torre } from '../dados/torres';
 import { useEscopo } from '../lib/escopo';
 import { num } from '../lib/formato';
 import { Titulo } from '../componentes/Titulo';
@@ -14,6 +14,7 @@ export type Aba = 'lista' | 'mapa';
 // Nada é calculado aqui: o status é o do controle. Linha e canteiro vêm do escopo; o resto fica na URL.
 export function Torres({ aba }: { aba: Aba }) {
   const { torres, carregando, erro } = useTorres();
+  const linhasCad = useLinhas();
   const { inclui } = useEscopo();
   const [params, setParams] = useSearchParams();
   const tipos = (params.get('tipos') ?? '').split(',').filter(Boolean);
@@ -43,6 +44,16 @@ export function Torres({ aba }: { aba: Aba }) {
       (!tramo || `${t.linha_sigla}-${t.tramo}` === tramo));
   }, [doRecorte, tipos, st, busca, tramo]);
   const sel = selId ? torres.find((t) => t.id === selId) ?? null : null;
+  // linha inteira no escopo (todos os canteiros dela) -> cabeçalho "LISTA COMPLETA <código>"
+  const completas = useMemo(() => {
+    const todos = new Map<string, Set<string>>(), noEscopo = new Map<string, Set<string>>();
+    for (const t of torres) if (t.canteiro) todos.set(t.linha_sigla, (todos.get(t.linha_sigla) ?? new Set()).add(t.canteiro));
+    for (const t of doRecorte) if (t.canteiro) noEscopo.set(t.linha_sigla, (noEscopo.get(t.linha_sigla) ?? new Set()).add(t.canteiro));
+    const codigo = new Map(linhasCad.dados.map((l) => [l.sigla, l.codigo]));
+    const m = new Map<string, string>();
+    for (const [l, cs] of noEscopo) if (cs.size === todos.get(l)?.size) m.set(l, codigo.get(l) ?? l);
+    return m;
+  }, [torres, doRecorte, linhasCad.dados]);
 
   const titulo = aba === 'lista' ? 'Lista' : 'Mapa de estruturas';
   if (carregando) return <><Titulo texto={titulo} /><p className="muted">Carregando torres…</p></>;
@@ -86,7 +97,7 @@ export function Torres({ aba }: { aba: Aba }) {
       )}
 
       {aba === 'lista'
-        ? <Lista torres={visiveis} ordem={ordem} selId={selId} abrir={(id) => mudar('torre', String(id))} escolherTramo={(t) => mudar('tramo', `${t.linha_sigla}-${t.tramo}`)} />
+        ? <Lista torres={visiveis} completas={completas} ordem={ordem} selId={selId} abrir={(id) => mudar('torre', String(id))} escolherTramo={(t) => mudar('tramo', `${t.linha_sigla}-${t.tramo}`)} />
         : <Mapa torres={visiveis} selId={selId} abrir={(id) => mudar('torre', String(id))} />}
 
       <FichaTorre t={sel} aoFechar={() => mudar('torre', '')} />
@@ -119,8 +130,8 @@ function valorComp(t: Torre, chave: string, metros?: boolean) {
 
 // Uma tabela só (como a aba LISTA), com todos os canteiros do escopo em sequência; na divisa entre canteiros, uma
 // linha levemente mais escura. Só mostra o grupo de composição (AUTOPORTANTE/ESTAIADA) que existe no recorte.
-export function Lista({ torres, ordem, selId, abrir, escolherTramo }: {
-  torres: Torre[]; ordem: 'torre' | 'seq'; selId: number | null; abrir: (id: number) => void; escolherTramo: (t: Torre) => void;
+export function Lista({ torres, completas, ordem, selId, abrir, escolherTramo }: {
+  torres: Torre[]; completas: Map<string, string>; ordem: 'torre' | 'seq'; selId: number | null; abrir: (id: number) => void; escolherTramo: (t: Torre) => void;
 }) {
   const grupos = useMemo(() => {
     const m = new Map<string, Torre[]>();
@@ -133,7 +144,10 @@ export function Lista({ torres, ordem, selId, abrir, escolherTramo }: {
   const varios = grupos.length > 1;
   const linhas = [...new Set(grupos.map(([, ts]) => ts[0].linha_sigla))];
   const titulo = linhas.map((l) => `${l} · ${grupos.filter(([, ts]) => ts[0].linha_sigla === l).map(([, ts]) => ts[0].canteiro).join(' + ')}`).join(' | ');
-  const abas = [...new Set(grupos.map(([, ts]) => ts.find((t) => t.fonte)?.fonte).filter((f): f is string => !!f).map(abaDaFonte))];
+  // por linha: "LISTA COMPLETA JZTIII-CAFII" se todos os canteiros dela estão no escopo; senão as abas dos canteiros
+  const abas = linhas.flatMap((l) => completas.has(l) ? [`LISTA COMPLETA ${completas.get(l)}`]
+    : [...new Set(grupos.filter(([, ts]) => ts[0].linha_sigla === l).map(([, ts]) => ts.find((t) => t.fonte)?.fonte)
+        .filter((f): f is string => !!f).map(abaDaFonte))]);
   return (
     <section className="panel lista-painel">
       <div className="tramo-h">
@@ -159,7 +173,7 @@ export function Lista({ torres, ordem, selId, abrir, escolherTramo }: {
                 <td className="r num">{t.sequencia ?? ''}</td>
                 <td className="tnum">{t.numero}</td>
                 {varios && <td className="cant">{t.canteiro}</td>}
-                <td>{t.tipo}{t.ancoragem && <span className="marca" title={t.arranjo_ferragens ?? ''}>anc.</span>}</td>
+                <td className="tipo">{t.tipo}{t.ancoragem && <span className="marca" title={t.arranjo_ferragens ?? ''}>anc.</span>}</td>
                 <td className="r num">{formatarMetros(t.altura_util)}</td>
                 <td className="r num">
                   <button className="tramo" onClick={(e) => { e.stopPropagation(); escolherTramo(t); }} title="Ver só este tramo">{t.tramo}</button>
