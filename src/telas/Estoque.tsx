@@ -1,11 +1,12 @@
 import { useMemo, useState } from 'react';
+import { Link } from 'react-router';
 import { Abas, Porcentagem, Titulo } from '../componentes/Titulo';
 import { useEscopo } from '../lib/escopo';
 import { num } from '../lib/formato';
-import { useConjuntosControle, useSaldos, type Saldo } from '../dados/recebimento';
+import { useEstoqueParte, useSaldos, type Saldo } from '../dados/recebimento';
 
 type Aba = 'volumes' | 'fixadores';
-const n = (v: number | string | null) => Number(v ?? 0);
+const n = (v: number | string | null | undefined) => Number(v ?? 0);
 
 // Estoque = previsto × recebido por material, só do que tem previsto no escopo (VOLUMES RECEBIDOS e fixadores).
 export function Estoque() {
@@ -36,8 +37,8 @@ export function Estoque() {
 }
 
 function Volumes({ volumes, canteiros, tipoSel, setTipoSel }: { volumes: Saldo[]; canteiros: { linha: string; canteiro: string }[]; tipoSel: string; setTipoSel: (t: string) => void }) {
-  const conj = useConjuntosControle();
-  const ccControle = new Map(conj.dados.map((c) => [`${c.linha_id}|${c.canteiro_id}|${c.material_id}`, Number(c.quantidade)]));
+  const est = useEstoqueParte();
+  const porParte = new Map(est.dados.map((x) => [`${x.linha}|${x.canteiro}|${x.tipo}|${x.parte}`, x]));
   const tipos = [...new Set(volumes.map((v) => v.tipo ?? '—'))];
   const tipo = tipos.includes(tipoSel) ? tipoSel : tipos[0];
   const pesoPct = (t: string) => {
@@ -76,15 +77,17 @@ function Volumes({ volumes, canteiros, tipoSel, setTipoSel }: { volumes: Saldo[]
                 <thead><tr>
                   <th>Volume</th><th className="r">Previsto</th><th className="r">Recebido</th><th className="r">Falta</th>
                   <th className="r">Peso unit. (kg)</th><th className="r">Peso recebido (kg)</th><th className="r">Conjunto completo</th>
+                  <th className="r">Torres atendidas</th><th>Próxima torre</th>
                 </tr></thead>
                 <tbody>
                   {[...grupos].flatMap(([parte, g]) => {
-                    // CONJUNTO COMPLETO: valor do próprio controle (a regra varia por parte); sem ele, menor recebido da parte
-                    const doControle = g.map((v) => ccControle.get(`${v.linha_id}|${v.canteiro_id}|${v.material_id}`)).find((x) => x !== undefined);
-                    const cc = doControle ?? Math.min(...g.map((v) => n(v.recebido)));
-                    const prv = n(g[0].previsto);
+                    // CONJUNTO COMPLETO do estoque (mesmo valor que pinta a LISTA) e até onde ele chega na sequência de ataque
+                    const ep = porParte.get(`${linha}|${canteiro}|${g[0].tipo}|${parte}`);
+                    const cc = n(ep?.conjunto);
+                    const prv = n(ep?.previsto ?? g[0].previsto);
+                    const est = { verticalAlign: 'middle' as const, background: 'var(--rec)', borderLeft: '2px solid var(--line)' };
                     return [
-                      <tr key={`p${parte}`} className="sec"><td colSpan={7}>{parte}</td></tr>,
+                      <tr key={`p${parte}`} className="sec"><td colSpan={9}>{parte}</td></tr>,
                       ...g.map((v, i) => (
                         <tr key={v.material_id}>
                           <td>{v.descricao}</td>
@@ -93,11 +96,21 @@ function Volumes({ volumes, canteiros, tipoSel, setTipoSel }: { volumes: Saldo[]
                           <td className={`r num ${n(v.previsto) > n(v.recebido) ? 'warn' : ''}`}>{num(Math.max(0, n(v.previsto) - n(v.recebido)))}</td>
                           <td className="r num">{num(v.peso_unit, 3)}</td>
                           <td className="r num">{num(n(v.recebido) * n(v.peso_unit), 1)}</td>
-                          {i === 0 && (
-                            <td className="r num" rowSpan={g.length} style={{ verticalAlign: 'middle', fontSize: 16, fontWeight: 700, background: 'var(--rec)', borderLeft: '2px solid var(--line)', color: cc >= prv ? 'var(--ok)' : undefined }}>
-                              {num(cc)}<div className="muted" style={{ fontSize: 11.5, fontWeight: 400 }}>de {num(prv)}{doControle === undefined ? ' · calculado' : ''}</div>
+                          {i === 0 && (<>
+                            <td className="r num" rowSpan={g.length} style={{ ...est, fontSize: 16, fontWeight: 700, color: cc >= prv ? 'var(--ok)' : undefined }}>
+                              {num(cc)}<div className="muted" style={{ fontSize: 11.5, fontWeight: 400 }}>de {num(prv)}</div>
                             </td>
-                          )}
+                            <td className="r num" rowSpan={g.length} style={{ ...est, fontSize: 15, fontWeight: 700 }}>
+                              {ep?.torres ? <>{ep.atendidas} <span className="muted" style={{ fontWeight: 400, fontSize: 12 }}>de {ep.torres}</span>
+                                {ep.ultima_atendida && <div className="muted" style={{ fontSize: 11.5, fontWeight: 400 }}>até {ep.ultima_atendida}</div>}</> : '—'}
+                            </td>
+                            <td rowSpan={g.length} style={{ verticalAlign: 'middle' }}>
+                              {ep?.proxima_torre
+                                ? <Link to={`/lista?q=${encodeURIComponent(ep.proxima_torre)}`} title="Ver na Lista">{ep.proxima_torre}</Link>
+                                : ep?.torres ? <span style={{ color: 'var(--ok)' }}>todas atendidas</span> : '—'}
+                              {ep?.proxima_seq != null && <div className="muted" style={{ fontSize: 11.5 }}>seq. {ep.proxima_seq}</div>}
+                            </td>
+                          </>)}
                         </tr>
                       )),
                     ];

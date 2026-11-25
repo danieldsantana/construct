@@ -69,3 +69,12 @@ export const useConjuntosControle = () =>
 
 export const useLancamentos = () =>
   useTabela<Lancamento>('movimento_item_detalhe', '*', ['movimento_id', 'material_id']);
+
+// Estoque por parte ligado à LISTA: conjunto completo do estoque e até onde ele chega na sequência de ataque.
+export type EstoqueParte = {
+  linha: string; canteiro: string; tipo: string | null; parte: string; conjunto: number; previsto: number;
+  torres: number | null; atendidas: number | null; ultima_atendida: string | null; proxima_torre: string | null; proxima_seq: number | null;
+};
+export const useEstoqueParte = () =>
+  useTabela<EstoqueParte>('estoque_parte', 'linha, canteiro, tipo, parte, conjunto, previsto, torres, atendidas, ultima_atendida, proxima_torre, proxima_seq',
+    ['linha', 'canteiro', 'tipo', 'parte']);
