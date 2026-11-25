@@ -53,8 +53,11 @@ main:has(> .torres.cheia) { overflow: hidden; padding-bottom: 12px; display: fle
 .torres-tabela table.lista td.g0 { border-left: 2px solid var(--line); }
 .torres-tabela table.lista th.g0, .torres-tabela table.lista th.grp { border-left: 2px solid rgba(255,255,255,.55); }
 
-/* pintura da LISTA (como no controle: verde completo, vermelho falta) */
-.torres-tabela table.lista td.pint-ok, .drawer td.pint-ok { background: #00b050; color: #fff; font-weight: 600; }
-.torres-tabela table.lista td.pint-falta, .drawer td.pint-falta { background: #ff0000; color: #fff; font-weight: 600; }
-.torres-tabela table.lista tbody tr:hover td.pint-ok { background: #00983f; }
-.torres-tabela table.lista tbody tr:hover td.pint-falta { background: #e00000; }
+/* pintura da LISTA: verde = completo, vermelho = falta (tons suaves, no visual da ferramenta) */
+.torres-tabela table.lista td.pint-ok, .drawer td.pint-ok { background: #e2f3e7; color: #17663a; font-weight: 600; }
+.torres-tabela table.lista td.pint-falta, .drawer td.pint-falta { background: #fbe4e2; color: #a8261d; font-weight: 600; }
+.torres-tabela table.lista tbody tr:hover td.pint-ok { background: #cfeAd8; }
+.torres-tabela table.lista tbody tr:hover td.pint-falta { background: #f6d0cc; }
+/* célula sem componente: apagada, não chama atenção */
+.torres-tabela table.lista td.vazio { background: #f7f8fa; border-color: #eef0f3; }
+.torres-tabela table.lista tbody tr:hover td.vazio { background: #eef1f6; }

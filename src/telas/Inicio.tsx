@@ -3,9 +3,9 @@ import { Link, useNavigate } from 'react-router';
 import { Porcentagem, Titulo } from '../componentes/Titulo';
 import { useEscopo } from '../lib/escopo';
 import { data, num } from '../lib/formato';
-import { useNotasFiscais, useSaldos, type NotaFiscal } from '../dados/recebimento';
+import { useEstoqueParte, useNotasFiscais, useSaldos, type NotaFiscal } from '../dados/recebimento';
 import { ofCurta, useOFs, useOFNFs } from '../dados/ofs';
-import { useParteConjunto, useTabelasControle } from '../dados/inicio';
+import { useTabelaAuto } from '../dados/inicio';
 
 const n = (v: number | string | null | undefined) => Number(v ?? 0);
 const HOJE = new Date();
@@ -17,8 +17,8 @@ export function Inicio() {
   const { inclui, escopo } = useEscopo();
   const ir = useNavigate();
   const nfs = useNotasFiscais();
-  const tabelas = useTabelasControle();
-  const partes = useParteConjunto();
+  const tabelas = useTabelaAuto();
+  const partes = useEstoqueParte();
   const saldos = useSaldos();
   const ofs = useOFs();
   const ofNfs = useOFNFs();
@@ -105,7 +105,7 @@ export function Inicio() {
               <tr key={t}><td>{t}</td><td className="r num">{a.prev}</td><td className="r num">{a.comp}</td><td><Porcentagem valor={a.prev ? a.comp / a.prev : 0} ok={a.comp >= a.prev} /></td></tr>
             ))}</tbody>
           </table>
-          <div className="foot"><Link to="/mapa">Ver mapa de estruturas</Link> <span className="muted">· origem: TABELAS (confere com a LISTA)</span></div>
+          <div className="foot"><Link to="/mapa">Ver mapa de estruturas</Link> <span className="muted">· status automático pela Lista (fixadores ainda não entram)</span></div>
         </div>
 
         <div className="card">
@@ -126,7 +126,7 @@ export function Inicio() {
           <div className="card-h"><span className="big">{limita.length}</span><b>Partes que mais limitam</b></div>
           <ul>{limita.slice(0, 7).map((p, i) => li(i, <>{p.tipo} · {p.parte} <span className="muted">· {p.canteiro}</span></>,
             `${num(p.conjunto)} de ${num(p.previsto)}`, '/estoque'))}{limita.length === 0 && nada}</ul>
-          <div className="foot"><span className="muted">conjuntos completos (valor do controle; não inclui lançamentos feitos aqui) · origem: VOLUMES RECEBIDOS</span></div>
+          <div className="foot"><span className="muted">conjunto completo do estoque (inclui lançamentos feitos aqui)</span></div>
         </div>
 
         <div className="card">

@@ -12,3 +12,7 @@ export const useTabelasControle = () =>
 export type ParteConjunto = { linha: string; canteiro: string; tipo: string | null; parte: string; primeiro_volume: string; conjunto: number; previsto: number };
 export const useParteConjunto = () =>
   useTabela<ParteConjunto>('parte_conjunto', '*', ['linha', 'canteiro', 'tipo', 'parte']);
+
+// TABELAS pelo status automático (previsto = torres do tipo na LISTA; completas = status automático Entregue)
+export type TabelaAuto = { linha: string; canteiro: string; tipo: string; previsto: number; completas: number };
+export const useTabelaAuto = () => useTabela<TabelaAuto>('tabela_auto', '*', ['linha', 'canteiro', 'tipo']);

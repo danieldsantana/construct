@@ -1,6 +1,6 @@
 import { useMemo } from 'react';
 import { useSearchParams } from 'react-router';
-import { COMPOSICAO, formatarMetros, statusDaTorre, useLinhas, useTorreComponentes, useTorres, type ClasseStatus, type Torre, type TorreComponente } from '../dados/torres';
+import { COMPOSICAO, formatarMetros, statusDaTorre, useLinhas, useStatusAuto, useTorreComponentes, useTorres, type ClasseStatus, type Torre, type TorreComponente } from '../dados/torres';
 import { useEscopo } from '../lib/escopo';
 import { num } from '../lib/formato';
 import { Titulo } from '../componentes/Titulo';
@@ -13,7 +13,15 @@ export type Aba = 'lista' | 'mapa';
 // São dois menus separados (como no controle); filtros, busca e ficha são os mesmos.
 // Nada é calculado aqui: o status é o do controle. Linha e canteiro vêm do escopo; o resto fica na URL.
 export function Torres({ aba }: { aba: Aba }) {
-  const { torres, carregando, erro } = useTorres();
+  const base = useTorres();
+  const auto = useStatusAuto();
+  // status automático (a LISTA manda); o digitado no controle fica em status_controle só para comparação
+  const torres = useMemo(() => {
+    const m = new Map(auto.dados.map((a) => [a.torre_id, a.status]));
+    return base.torres.map((t) => ({ ...t, status_controle: t.status, status: t.status === null ? null : m.get(t.id) ?? 'Faltante' }));
+  }, [base.torres, auto.dados]);
+  const carregando = base.carregando || auto.carregando;
+  const erro = base.erro ?? auto.erro;
   const pintura = useTorreComponentes();
   const cores = useMemo(() => new Map(pintura.dados.map((p) => [`${p.torre_id}|${p.chave}`, p])), [pintura.dados]);
   const linhasCad = useLinhas();
@@ -181,7 +189,7 @@ export function Lista({ torres, cores, completas, ordem, selId, abrir, escolherT
                   <button className="tramo" onClick={(e) => { e.stopPropagation(); escolherTramo(t); }} title="Ver só este tramo">{t.tramo}</button>
                 </td>
                 <td><Status t={t} /></td>
-                {comp.flatMap((g) => g.colunas.map((c, ci) => <td key={c.chave} className={`r num comp ${ci === 0 ? 'g0' : ''} ${classeCor(cores.get(`${t.id}|${c.chave}`))}`}>{valorComp(t, c.chave, c.metros)}</td>))}
+                {comp.flatMap((g) => g.colunas.map((c, ci) => <td key={c.chave} className={`r num comp ${ci === 0 ? 'g0' : ''} ${valorComp(t, c.chave, c.metros) ? classeCor(cores.get(`${t.id}|${c.chave}`)) : 'vazio'}`}>{valorComp(t, c.chave, c.metros)}</td>))}
               </tr>
             )))}
           </tbody>
@@ -202,7 +210,7 @@ export function Mapa({ torres, selId, abrir }: { torres: Torre[]; selId: number 
   return (
     <>
       <div className="legend muted" style={{ fontSize: 12.5, display: 'flex', gap: 14, marginBottom: 8, flexWrap: 'wrap' }}>
-        <span><i className="b ok" />Entregue</span><span><i className="b falta" />Faltante</span>
+        <span><i className="b ok" />Entregue (todos os componentes completos na Lista)</span><span><i className="b falta" />Faltante</span>
         <span><i className="b sf" />Outro status</span><span><i className="b sem" />Sem controle importado</span>
         <span>· traço laranja fino sob o número = ancoragem</span>
       </div>
@@ -242,7 +250,7 @@ export function FichaTorre({ t, cores, aoFechar }: { t: Torre | null; cores: Map
     <Gaveta aberta={!!t} aoFechar={aoFechar} sub={t ? `${t.linha_sigla} · ${t.canteiro ?? 'sem canteiro'} · tramo ${t.tramo ?? '—'}` : ''}
             titulo={t ? <>Torre {t.numero} <span style={{ fontWeight: 400, fontSize: 16 }}>{t.tipo}</span></> : ''}
             resumo={t ? [
-              ['Status no controle', <Status key="s" t={t} />],
+              ['Status (automático)', <Status key="s" t={t} />],
               ['Seq. de ataque', t.sequencia ?? '—'],
               ['Altura útil', `${formatarMetros(t.altura_util)} m`],
               ['Categoria', t.categoria],
@@ -260,6 +268,9 @@ export function FichaTorre({ t, cores, aoFechar }: { t: Torre | null; cores: Map
                     : '—'}
                   {t.perna_referencia && <span className="muted"> · referência {t.perna_referencia}</span>}
                 </td></tr>
+                {t.status_controle && t.status_controle.trim().toLowerCase() !== (t.status ?? '').toLowerCase() && (
+                  <tr><td className="muted">Status digitado no controle</td><td>{t.status_controle} <span className="muted">(difere do automático)</span></td></tr>
+                )}
                 <tr><td className="muted">Ancoragem</td><td>{t.ancoragem ? 'sim' : 'não'}</td></tr>
                 <tr><td className="muted">Arranjo de ferragens</td><td>{t.arranjo_ferragens ?? '—'}</td></tr>
               </tbody>
