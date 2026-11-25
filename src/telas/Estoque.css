@@ -36,7 +36,7 @@ table.est-vol .esq { text-align: left; }
 /* mesmas cores da Lista */
 table.est td.pint-ok { background-color: #bfe6cb; color: #0f5a2c; font-weight: 600; }
 table.est td.pint-falta { background-color: #f6c4bf; color: #8f1d15; font-weight: 600; }
-table.est td.vazio { background-color: #fbfbfc; border-color: #f3f4f6; }
+table.est td.vazio { background-color: #f1f3f6; border-color: #e7eaee; }
 table.est tr.parte:hover > td.pint-ok { background-color: #a9dcb9; }
 table.est tr.parte:hover > td.pint-falta { background-color: #efaea7; }
 
