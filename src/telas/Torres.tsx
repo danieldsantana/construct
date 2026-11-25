@@ -51,7 +51,7 @@ export function Torres({ aba }: { aba: Aba }) {
   const semControle = doRecorte.filter((t) => t.status === null).length;
 
   return (
-    <div className="torres">
+    <div className={`torres ${aba === 'lista' ? 'cheia' : ''}`}>
       <Titulo texto={titulo}><span className="num">{visiveis.length} de {doRecorte.length} torres</span></Titulo>
 
       <div className="toolbar">
@@ -135,7 +135,7 @@ export function Lista({ torres, ordem, selId, abrir, escolherTramo }: {
   const titulo = linhas.map((l) => `${l} · ${grupos.filter(([, ts]) => ts[0].linha_sigla === l).map(([, ts]) => ts[0].canteiro).join(' + ')}`).join(' | ');
   const abas = [...new Set(grupos.map(([, ts]) => ts.find((t) => t.fonte)?.fonte).filter((f): f is string => !!f).map(abaDaFonte))];
   return (
-    <section className="panel" style={{ marginBottom: 12 }}>
+    <section className="panel lista-painel">
       <div className="tramo-h">
         <b>{titulo.toUpperCase()}</b>
         <span className="muted num">{torres.length} torres</span>

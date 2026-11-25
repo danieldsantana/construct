@@ -1,4 +1,4 @@
-.torres { display: grid; gap: 0; min-width: 0; }
+.torres { display: grid; grid-template-columns: minmax(0, 1fr); gap: 0; min-width: 0; }
 .torres .toolbar input[type="search"] { min-width: 200px; }
 .torres-tipos { margin-bottom: 10px; }
 .torres .chip .b { display: inline-block; width: 12px; height: 9px; margin-right: 6px; vertical-align: middle; }
@@ -35,3 +35,14 @@
 /* divisa entre canteiros na Lista: só um tom acima da grade */
 .torres-tabela table.lista tr.divisa td { border-top: 1px solid var(--line); }
 .torres-tabela table.lista td.cant { font-size: 12px; color: var(--muted); }
+
+/* Lista ocupa a altura da tela: só a tabela rola (vertical e horizontal); a página não rola */
+main:has(> .torres.cheia) { overflow: hidden; padding-bottom: 12px; display: flex; flex-direction: column; }
+.torres.cheia { flex: 1; min-height: 0; display: flex; flex-direction: column; }
+.torres.cheia > * { flex: 0 0 auto; }
+.torres.cheia > .lista-painel { flex: 1 1 auto; min-height: 0; display: flex; flex-direction: column; }
+.lista-painel .torres-tabela { flex: 1 1 auto; min-height: 0; max-height: none; }
+@media (max-width: 800px) {
+  main:has(> .torres.cheia) { overflow: auto; display: block; }
+  .lista-painel .torres-tabela { max-height: 70vh; }
+}
