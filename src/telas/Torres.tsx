@@ -167,7 +167,7 @@ export function Lista({ torres, cores, completas, ordem, selId, abrir, escolherT
     if (ordem === 'seq') for (const g of m.values()) g.sort((a, b) => (a.sequencia ?? 1e9) - (b.sequencia ?? 1e9) || a.ordem - b.ordem);
     return [...m];
   }, [torres, ordem]);
-  // seleção múltipla (clique, arrastar, Ctrl); sem a cruz: marca a célula e, na linha, TORRE e TIPO. Ficha: duplo clique.
+  // cruz do mouse; seleção múltipla (clique, arrastar, Ctrl) marca só a célula e, na linha, TORRE e TIPO. Ficha: duplo clique.
   const cruz = useTabelaCruz({ cruz: false, referencia: 'td.tnum, td.tipo' });
   if (!torres.length) return <p className="muted">Nenhuma torre neste recorte.</p>;
   const comp = COMPOSICAO.filter((g) => torres.some((t) => t.categoria === (g.grupo === 'AUTOPORTANTE' ? 'autoportante' : 'estaiada')));
@@ -188,7 +188,7 @@ export function Lista({ torres, cores, completas, ordem, selId, abrir, escolherT
         {abas.length > 0 && <span className="muted" style={{ fontSize: 12 }}>{abas.join(' · ')}</span>}
       </div>
       <div className="torres-tabela">
-        <table className="lista selecionavel" ref={cruz.ref} onMouseDown={cruz.onMouseDown} onMouseOver={cruz.onMouseOver} onMouseLeave={cruz.onMouseLeave}>
+        <table className="lista cruz selecionavel" ref={cruz.ref} onMouseDown={cruz.onMouseDown} onMouseOver={cruz.onMouseOver} onMouseLeave={cruz.onMouseLeave}>
           <thead>
             <tr>
               <th rowSpan={2} className="r">Seq.</th><th rowSpan={2}>Torre</th><th rowSpan={2}>Tipo</th>

@@ -6,8 +6,8 @@ import { useCallback, useEffect, useLayoutEffect, useRef, type MouseEvent } from
 // Tudo é aplicado direto no DOM (sem estado do React): mover o mouse ou arrastar não redesenha a tabela.
 type Pos = { r: number; c: number };
 
-// Opções: cruz = destaque de linha/coluna (mouse e seleção); referencia = seletor das células da linha que acompanham a
-// seleção quando não há cruz (ex. Lista: 'td.tnum, td.tipo').
+// A cruz do mouse vale sempre. Opções da SELEÇÃO: cruz = sombra fixa na linha/coluna das células selecionadas;
+// referencia = seletor das células da linha que acompanham a seleção (ex. Lista: 'td.tnum, td.tipo', sem cruz fixa).
 export function useTabelaCruz({ cruz = true, referencia = '' }: { cruz?: boolean; referencia?: string } = {}) {
   const ref = useRef<HTMLTableElement>(null);
   const resumoRef = useRef<HTMLSpanElement>(null);
@@ -81,7 +81,7 @@ export function useTabelaCruz({ cruz = true, referencia = '' }: { cruz?: boolean
     const td = (e.target as HTMLElement).closest('td') as HTMLTableCellElement | null;
     const tr = td?.parentElement as HTMLTableRowElement | undefined;
     // coluna sob o mouse: atributo na tabela (o CSS pinta a coluna), sem redesenhar
-    const col = cruz && td && tr?.dataset.k && td.closest('table') === t ? String(td.cellIndex) : '';
+    const col = td && tr?.dataset.k && td.closest('table') === t ? String(td.cellIndex) : '';
     if (t.dataset.col !== col) { if (col) t.dataset.col = col; else delete t.dataset.col; }
     const a = arraste.current;
     if (!a || !(e.buttons & 1) || !td || !tr?.dataset.k) return;
