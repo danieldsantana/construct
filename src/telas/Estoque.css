@@ -1,0 +1,46 @@
+/* Estoque no mesmo estilo da Lista: tabela única, grade, valores centralizados, cores suaves; só a tabela rola */
+.estoque { display: grid; grid-template-columns: minmax(0, 1fr); min-width: 0; }
+main:has(> .estoque.cheia) { overflow: hidden; padding-bottom: 12px; display: flex; flex-direction: column; }
+.estoque.cheia { flex: 1; min-height: 0; display: flex; flex-direction: column; }
+.estoque.cheia > * { flex: 0 0 auto; }
+.estoque.cheia > .estoque-painel { flex: 1 1 auto; min-height: 0; display: flex; flex-direction: column; }
+.estoque-tabela { flex: 1 1 auto; min-height: 0; overflow: auto; }
+.estoque .chip.limpar { border-style: dashed; }
+
+table.est td, table.est th { text-align: center; }
+table.est td { padding: 4px 8px; font-size: 13px; white-space: nowrap; }
+table.est .esq { text-align: left; }
+table.est th { top: 0; }
+table.est td.g0, table.est th.g0 { border-left: 2px solid var(--line); }
+table.est thead th.g0 { border-left-color: rgba(255,255,255,.55); }
+table.est tr.divisa > td { border-top: 1px solid var(--line); }
+table.est td.tipo { font-weight: 700; color: var(--navy); }
+table.est td.cant { font-size: 12px; color: var(--muted); }
+table.est td.secao { font-size: 12px; }
+table.est .pct { justify-content: center; }
+table.est .ok { color: #17663a; font-weight: 600; }
+
+table.est tr.parte { cursor: pointer; }
+table.est tr.parte:hover > td { background: var(--navy-tint); }
+table.est tr.parte .seta { display: inline-block; width: 14px; color: var(--muted); font-size: 11px; }
+table.est tr.parte .vol { margin-left: 8px; font-size: 11.5px; }
+table.est tr.parte.aberta > td { background: #f3f6fb; }
+
+/* volumes da parte (ao abrir) */
+table.est tr.vols > td { padding: 4px 8px 10px 30px; background: #fafbfc; }
+table.est-vol { width: auto; min-width: 640px; }
+table.est-vol th { position: static; background: var(--navy-2); font-size: 11px; text-transform: none; padding: 3px 8px; }
+table.est-vol td { padding: 2px 8px; font-size: 12.5px; text-align: center; background: var(--panel); }
+table.est-vol .esq { text-align: left; }
+
+/* mesmas cores da Lista */
+table.est td.pint-ok { background: #bfe6cb; color: #0f5a2c; font-weight: 600; }
+table.est td.pint-falta { background: #f6c4bf; color: #8f1d15; font-weight: 600; }
+table.est td.vazio { background: #fbfbfc; border-color: #f3f4f6; }
+table.est tr.parte:hover > td.pint-ok { background: #a9dcb9; }
+table.est tr.parte:hover > td.pint-falta { background: #efaea7; }
+
+@media (max-width: 800px) {
+  main:has(> .estoque.cheia) { overflow: auto; display: block; }
+  .estoque-tabela { max-height: 70vh; }
+}
