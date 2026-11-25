@@ -47,3 +47,9 @@ export function SessaoProvider({ children }: { children: ReactNode }) {
 export function useSessao() {
   return useContext(SessaoContexto);
 }
+
+// Pode lançar (perfil editor ativo)?
+export function useEditor() {
+  const s = useSessao() as { perfil?: Perfil | null };
+  return !!s.perfil && s.perfil.ativo && s.perfil.papel === 'editor';
+}

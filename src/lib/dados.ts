@@ -21,15 +21,32 @@ type Estado<T> = { dados: T[]; carregando: boolean; erro: string | null };
 const cache = new Map<string, unknown[]>();
 const emAndamento = new Map<string, Promise<unknown[]>>();
 
+// Depois de um lançamento (NF, recebimento, confirmação…): limpa o cache e avisa as telas abertas para buscar de novo.
+let versao = 0;
+const ouvintes = new Set<() => void>();
+export function recarregarDados() {
+  cache.clear();
+  emAndamento.clear();
+  versao += 1;
+  ouvintes.forEach((f) => f());
+}
+
 // Carrega uma tabela/consulta inteira uma vez por sessão; filtros e buscas rodam no navegador.
 export function useTabela<T>(tabela: string, select: string, ordem: string[]): Estado<T> {
   const chave = `${tabela}|${select}|${ordem.join(',')}`;
+  const [v, setV] = useState(versao);
   const [estado, setEstado] = useState<Estado<T>>(() => {
     const c = cache.get(chave) as T[] | undefined;
     return { dados: c ?? [], carregando: !c, erro: null };
   });
   useEffect(() => {
-    if (cache.has(chave)) return;
+    const f = () => setV(versao);
+    ouvintes.add(f);
+    return () => { ouvintes.delete(f); };
+  }, []);
+  useEffect(() => {
+    const c = cache.get(chave) as T[] | undefined;
+    if (c) { setEstado({ dados: c, carregando: false, erro: null }); return; }
     let ativo = true;
     let p = emAndamento.get(chave) as Promise<T[]> | undefined;
     if (!p) {
@@ -46,6 +63,6 @@ export function useTabela<T>(tabela: string, select: string, ordem: string[]): E
     });
     return () => { ativo = false; };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [chave]);
+  }, [chave, v]);
   return estado;
 }

@@ -294,3 +294,19 @@ table.selecionavel tbody td.selc { background-image: linear-gradient(rgba(0, 46,
 table.selecionavel tbody td.sel-ref { background-image: linear-gradient(rgba(0, 46, 109, .055), rgba(0, 46, 109, .055)); }
 table.selecionavel tbody td.tnum.sel-ref { background-image: linear-gradient(rgba(255, 255, 255, .16), rgba(255, 255, 255, .16)); }
 .ok-txt { color: var(--ok); font-weight: 600; }
+
+/* fluxo de lançamento das NFs */
+.fluxo h2 { margin-top: 6px; }
+.acoes-nf { border-top: 1px solid var(--line); margin-top: 10px; padding-top: 10px; display: grid; gap: 8px; }
+.linha-acao { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; }
+.linha-acao label, .campos label { display: grid; gap: 3px; font-size: 12px; color: var(--muted); }
+button.pri { background: var(--navy); color: #fff; border-color: var(--navy); font-weight: 600; }
+button.pri:disabled { opacity: .5; }
+.pend-form table td { padding: 3px 4px; }
+.pend-form input, .pend-form select { max-width: 220px; }
+.campos { display: grid; grid-template-columns: repeat(auto-fill, minmax(170px, 1fr)); gap: 10px; }
+.campos input, .campos select { width: 100%; }
+.lancar-grade { overflow: auto; max-height: calc(100vh - 360px); }
+.lancar-grade td { padding: 3px 8px; font-size: 13px; }
+.lancar-grade th.nfcolh { background: var(--orange); }
+.lancar-grade input.qtd { width: 80px; text-align: right; background: var(--orange-tint); border-color: #f3c9a6; }

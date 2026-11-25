@@ -2,6 +2,8 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useSearchParams } from 'react-router';
 import { Abas, Titulo } from '../componentes/Titulo';
 import { Gaveta } from '../componentes/Gaveta';
+import { AcoesNF, LancarNF } from './NotasFluxo';
+import { useEditor } from '../lib/sessao';
 import { useEscopo } from '../lib/escopo';
 import { colunaDaOrigem, data, num } from '../lib/formato';
 import {
@@ -9,7 +11,7 @@ import {
   type NotaFiscal, type Recebimento, type SituacaoNF,
 } from '../dados/recebimento';
 
-type Vista = 'lista' | 'planilha';
+type Vista = 'lista' | 'planilha' | 'lancar';
 type Filtro = 'todas' | 'nao_recebida' | 'recebidas' | 'em_conferencia' | 'reposicao' | 'sem_controle' | 'outros';
 const FILTROS: Filtro[] = ['todas', 'nao_recebida', 'recebidas', 'em_conferencia', 'reposicao', 'sem_controle', 'outros'];
 type Linha =
@@ -17,7 +19,7 @@ type Linha =
   | { k: 'mov'; id: string; mov: Recebimento; quando: string };
 
 export const SITUACAO: Record<SituacaoNF, [string, string, string]> = {
-  nao_recebida: ['Não recebida', 'neutro', 'Emitida (PDF chegou por e-mail) e ainda não lançada no controle do canteiro de destino.'],
+  nao_recebida: ['Emitida', 'neutro', 'Emitida e ainda não recebida no canteiro de destino.'],
   em_conferencia: ['Em conferência', 'conf', 'Recebida, conferência em andamento.'],
   confirmada: ['Recebida', 'ok', 'Lançada no controle do canteiro.'],
   sem_controle: ['Sem controle importado', 'info', 'O controle do canteiro de destino ainda não está no banco: não dá para saber se foi recebida.'],
@@ -32,6 +34,7 @@ export function Notas() {
   const nfs = useNotasFiscais();
   const rec = useRecebimentos();
   const [vista, setVista] = useState<Vista>('lista');
+  const editor = useEditor();
   const [params] = useSearchParams();  // ?filtro=nao_recebida&nf=<id> (links da tela Início)
   const [filtro, setFiltro] = useState<Filtro>(() => {
     const f = params.get('filtro') as Filtro | null;
@@ -75,14 +78,14 @@ export function Notas() {
   if (carregando) return <><Titulo texto="Notas fiscais" /><p className="muted">Carregando…</p></>;
   if (erro) return <><Titulo texto="Notas fiscais" /><p className="warn">Não foi possível carregar: {erro}</p></>;
 
-  const filtros: [Filtro, string][] = [['todas', 'Todas'], ['nao_recebida', 'Não recebidas'], ['recebidas', 'Recebidas'], ['em_conferencia', 'Em conferência'], ['reposicao', 'Reposições (SAC)'], ['sem_controle', 'Sem controle importado'], ['outros', 'Transferências e ajustes']];
+  const filtros: [Filtro, string][] = [['todas', 'Todas'], ['nao_recebida', 'Emitidas (não recebidas)'], ['recebidas', 'Recebidas'], ['em_conferencia', 'Em conferência'], ['reposicao', 'Reposições (SAC)'], ['sem_controle', 'Sem controle importado'], ['outros', 'Transferências e ajustes']];
 
   return (
     <>
       <Titulo texto="Notas fiscais"><span className="num">{visiveis.length}</span></Titulo>
-      <Abas<Vista> abas={[['lista', 'Notas fiscais'], ['planilha', 'Planilha de entrada']]} atual={vista} aoMudar={setVista} />
+      <Abas<Vista> abas={[['lista', 'Notas fiscais'], ['planilha', 'Planilha de entrada'], ...(editor ? [['lancar', 'Lançar NF'] as [Vista, string]] : [])]} atual={vista} aoMudar={setVista} />
 
-      {vista === 'lista' ? (
+      {vista === 'lancar' ? <LancarNF /> : vista === 'lista' ? (
         <>
           <div className="toolbar">
             <div className="chips">
@@ -256,7 +259,7 @@ function FichaNF({ nf, recebimentos, aoFechar }: { nf: NotaFiscal | null; recebi
             <div className="feito"><b>Emitida</b><span className="muted">{data(nf.emissao)}</span></div>
             <div className={nf.recebida_em ? 'feito' : 'atual'}><b>Recebida</b><span className="muted">{nf.recebida_em ? `${data(nf.recebida_em)} · ${nf.canteiro_recebimento}` : '—'}</span></div>
           </div>
-          {nf.situacao_exibida === 'nao_recebida' && <div className="callout">Emitida há {dias(nf.emissao)} dias e ainda não lançada no controle de {nf.destino}.</div>}
+          {nf.situacao_exibida === 'nao_recebida' && <div className="callout">Emitida há {dias(nf.emissao)} dias e ainda não recebida em {nf.destino ?? 'destino não informado'}.</div>}
           {nf.situacao_exibida === 'sem_controle' && <div className="callout">{SITUACAO.sem_controle[2]}</div>}
           {nf.destino && nf.canteiro_recebimento && nf.destino !== nf.canteiro_recebimento && <div className="callout">Destino na NF: {nf.destino}. Recebida em {nf.canteiro_recebimento}.</div>}
           <div className="fields">
@@ -266,6 +269,7 @@ function FichaNF({ nf, recebimentos, aoFechar }: { nf: NotaFiscal | null; recebi
             <div><span>SAC / RNC</span><b>{[nf.sac && `SAC ${nf.sac}`, nf.rnc && `RNC ${nf.rnc}`].filter(Boolean).join(' · ') || '—'}</b></div>
             <div style={{ gridColumn: '1 / -1' }}><span>Arquivo</span><b style={{ fontSize: 13 }}>{nf.arquivo ?? 'sem PDF no índice'}</b></div>
           </div>
+          <AcoesNF nf={nf} />
           <RomaneioXLancado nfId={nf.id} recebida={!!nf.recebida_em} />
           <h2>Itens recebidos</h2>
           <ItensDosMovimentos movimentos={movs} />

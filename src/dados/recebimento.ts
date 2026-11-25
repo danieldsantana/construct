@@ -1,4 +1,5 @@
-import { useTabela } from '../lib/dados';
+import { recarregarDados, useTabela } from '../lib/dados';
+import { supabase } from '../lib/supabase';
 
 export type Recebimento = {
   id: number;
@@ -57,10 +58,10 @@ export type NotaFiscal = {
   romaneio: string | null; valor: number | null; peso: number | null; arquivo: string | null; sac: string | null; rnc: string | null;
   linha: string | null; destino: string | null; canteiro_recebimento: string | null;
   recebida_em: string | null; recebimentos: number; itens: number; situacao_exibida: SituacaoNF;
-  local_entrega: string | null; linha_local: string | null;
+  local_entrega: string | null; linha_local: string | null; lancamento: 'pdf' | 'manual' | null;
 };
 export const useNotasFiscais = () =>
-  useTabela<NotaFiscal>('nf_lista', 'id, numero, emissao, fornecedor, of_texto, romaneio, valor, peso, arquivo, sac, rnc, linha, destino, canteiro_recebimento, recebida_em, recebimentos, itens, situacao_exibida, local_entrega, linha_local', ['id']);
+  useTabela<NotaFiscal>('nf_lista', 'id, numero, emissao, fornecedor, of_texto, romaneio, valor, peso, arquivo, sac, rnc, linha, destino, canteiro_recebimento, recebida_em, recebimentos, itens, situacao_exibida, local_entrega, linha_local, lancamento', ['id']);
 
 // Conjunto completo como o controle calcula (coluna I da VOLUMES RECEBIDOS), na 1ª linha de cada parte.
 export type ConjuntoControle = { linha_id: number; canteiro_id: number; material_id: number; quantidade: number };
@@ -86,3 +87,28 @@ export const useConferenciaNF = () =>
 export type LeituraRomaneio = { id: number; romaneio_confere: boolean | null; romaneio_obs: string | null; peso_danfe: number | null };
 export const useLeituraRomaneio = () =>
   useTabela<LeituraRomaneio>('nota_fiscal', 'id, romaneio_confere, romaneio_obs, peso_danfe', ['id']);
+
+// ---------- fluxo de lançamento das NFs (funções no banco; a tela só chama) ----------
+export type NFItem = { nota_fiscal_id: number; material_id: number; quantidade: number; secao: string; descricao: string; parte: string | null; unidade: string; peso_unit: number | null; ordem: number };
+export const useNFItens = () =>
+  useTabela<NFItem>('nf_item_detalhe', 'nota_fiscal_id, material_id, quantidade, secao, descricao, parte, unidade, peso_unit, ordem', ['nota_fiscal_id', 'ordem']);
+export type Pendencia = { id: number; nota_fiscal_id: number; nf: string; tipo: 'peca' | 'volume' | 'fixador'; material_id: number | null; material: string | null;
+  descricao: string | null; quantidade: number; motivo: 'falta' | 'avaria'; observacao: string | null; rnc: string | null; sac: string | null;
+  abertura: string | null; situacao: 'aberta' | 'reposta' | 'cancelada'; criado_em: string };
+export const usePendencias = () =>
+  useTabela<Pendencia>('nf_pendencia_detalhe', 'id, nota_fiscal_id, nf, tipo, material_id, material, descricao, quantidade, motivo, observacao, rnc, sac, abertura, situacao, criado_em', ['id']);
+
+export type NFLancamento = { numero: string; emissao?: string; of?: string; romaneio?: string; valor?: string; peso?: string; linha: string; destino: string;
+  lancamento: 'pdf' | 'manual'; itens: { material_id: number; quantidade: number }[] };
+async function chamar<T>(fn: string, args: Record<string, unknown>): Promise<T> {
+  const { data, error } = await supabase.rpc(fn, args);
+  if (error) throw new Error(error.message);
+  recarregarDados();
+  return data as T;
+}
+export const salvarNF = (nf: NFLancamento) => chamar<number>('nf_salvar', { p: nf });
+export const marcarRecebida = (nf: number, data: string, canteiro: string, linha?: string) =>
+  chamar<number>('nf_marcar_recebida', { p_nf: nf, p_data: data, p_canteiro: canteiro, p_linha: linha ?? null });
+export type PendenciaNova = { tipo: 'peca' | 'volume' | 'fixador'; material_id: number | null; descricao?: string; quantidade: number; motivo: 'falta' | 'avaria'; observacao?: string };
+export const confirmarNF = (nf: number, pendencias: PendenciaNova[] = []) => chamar<void>('nf_confirmar', { p_nf: nf, p_pendencias: pendencias });
+export const desfazerRecebimento = (nf: number) => chamar<void>('nf_desfazer_recebimento', { p_nf: nf });
