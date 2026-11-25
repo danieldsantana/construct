@@ -38,8 +38,10 @@ h2 { font-size: 15px; }
 
 /* tabelas no padrão do controle */
 table { border-collapse: collapse; width: 100%; }
-th { text-align: left; font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: .02em; color: #fff; background: var(--navy); padding: 6px 10px; white-space: nowrap; position: sticky; top: 0; z-index: 1; }
-td { padding: 5px 10px; border-bottom: 1px solid var(--line-soft); vertical-align: middle; }
+th { text-align: left; font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: .02em; color: #fff; background: var(--navy); padding: 6px 10px; white-space: nowrap; position: sticky; top: 0; z-index: 1; border-right: 1px solid rgba(255,255,255,.18); }
+th:last-child { border-right: 0; }
+/* grade: linhas horizontais e verticais, como na planilha */
+td { padding: 5px 10px; border: 1px solid var(--line-soft); vertical-align: middle; }
 td.r, th.r { text-align: right; }
 td.prev { background: var(--prev); } td.rec { background: var(--rec); }
 tr.sec td { background: var(--sec); font-weight: 700; font-size: 13px; }
@@ -127,7 +129,7 @@ body.no-notes .notes { display: none; }
 .cell { width: 60px; padding: 0; border: 1px solid var(--line); background: var(--panel); display: grid; cursor: pointer; text-align: center; }
 .cell:hover { border-color: var(--navy); }
 .cell .n { background: var(--navy); color: #fff; font-weight: 700; font-size: 12.5px; padding: 2px 0; }
-.cell.anc .n { background: var(--navy-2); box-shadow: inset 0 -3px 0 var(--orange); }
+.cell.anc .n { background: var(--navy); box-shadow: inset 0 -1px 0 rgba(254,107,0,.35); }  /* ancoragem: marca quase invisível */
 .cell .t { font-size: 10.5px; color: var(--muted); padding: 2px 0 1px; white-space: nowrap; overflow: hidden; }
 .cell .b { height: 7px; }
 .b.ok { background: var(--ok); } .b.sf { background: var(--sf); } .b.falta { background: var(--falta); } .b.sem { background: repeating-linear-gradient(45deg, var(--line-soft) 0 3px, var(--panel) 3px 6px); }

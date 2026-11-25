@@ -188,14 +188,14 @@ export function Mapa({ torres, selId, abrir }: { torres: Torre[]; selId: number 
       <div className="legend muted" style={{ fontSize: 12.5, display: 'flex', gap: 14, marginBottom: 8, flexWrap: 'wrap' }}>
         <span><i className="b ok" />Entregue</span><span><i className="b falta" />Faltante</span>
         <span><i className="b sf" />Outro status</span><span><i className="b sem" />Sem controle importado</span>
-        <span>· faixa laranja sob o número = ancoragem</span>
+        <span>· traço laranja fino sob o número = ancoragem</span>
       </div>
       {tramos.map(([k, ts]) => {
         const [linha, tr] = k.split('|');
         const entregues = ts.filter((t) => statusDaTorre(t).classe === 'ok').length;
         const canteiros = [...new Set(ts.map((t) => t.canteiro))].join(', ');
         return (
-          <section key={k} className="panel" style={{ marginBottom: 10 }}>
+          <section key={k} className="panel tramo-leve" style={{ marginBottom: 6 }}>
             <div className="tramo-h">
               <b>{linha} · Tramo {tr}</b>
               <span className="muted num">{ts[0].numero} a {ts[ts.length - 1].numero} · {ts.length} torres · {canteiros}</span>

@@ -9,15 +9,23 @@
 .torres-tabela table.lista tbody tr { cursor: pointer; }
 .torres-tabela table.lista tbody tr:hover td { background: var(--navy-tint); }
 .torres-tabela table.lista tbody tr.sel td { background: var(--orange-tint); }
-.torres-tabela tr.ancoragem td { border-top: 2px solid var(--orange); }
+/* início de tramo (ancoragem): marca quase invisível */
+.torres-tabela tr.ancoragem td { border-top: 1px solid rgba(254,107,0,.22); }
 .torres-tabela th { top: 0; }
 .torres-tabela thead tr:nth-child(2) th { top: 27px; }
 .torres-tabela th.grp { text-align: center; background: var(--navy-2); border-left: 2px solid #fff; }
 .torres-tabela th.sub { font-size: 11px; text-transform: none; }
 .torres-tabela td.tnum { background: var(--navy); color: #fff; font-weight: 700; text-align: center; min-width: 54px; }
 .torres-tabela td.comp { color: var(--muted); }
-.torres-tabela .marca { margin-left: 6px; font-size: 11px; padding: 0 4px; border: 1px solid var(--orange); color: var(--orange); }
+.torres-tabela .marca { margin-left: 6px; font-size: 10.5px; color: var(--muted); opacity: .6; }
 .torres-tabela button.tramo { padding: 0 6px; border-color: transparent; background: transparent; }
 .torres-tabela button.tramo:hover { border-color: var(--line); background: var(--panel); }
 .drawer .ref, .torres-tabela .ref { text-decoration: underline; text-underline-offset: 3px; }
 .dr-t { font-size: 12px; text-transform: uppercase; letter-spacing: .04em; color: var(--muted); margin: 0 0 6px; }
+
+/* Mapa: separação entre tramos discreta (quase invisível) */
+.tramo-leve { border-color: var(--line-soft); }
+.tramo-leve .tramo-h { background: transparent; padding: 3px 10px 0; gap: 8px; }
+.tramo-leve .tramo-h b { font-size: 12px; font-weight: 600; color: var(--muted); }
+.tramo-leve .tramo-h span { font-size: 11.5px !important; opacity: .75; }
+.tramo-leve .cells { padding-top: 4px; }
