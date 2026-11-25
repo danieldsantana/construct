@@ -6,7 +6,9 @@
 
 .torres-tabela { overflow: auto; max-height: calc(100vh - 300px); }
 .torres-tabela table.lista td { padding: 3px 8px; font-size: 13px; white-space: nowrap; }
-.torres-tabela table.lista tbody tr.sel td { background: var(--orange-tint); }
+/* torre com a ficha aberta: linha em laranja claro, sem cobrir o número da torre */
+.torres-tabela table.lista tbody tr.sel td:not(.tnum) { background-color: var(--orange-tint); }
+.torres-tabela table.lista tbody tr.sel td.tnum { box-shadow: inset 0 0 0 2px var(--orange); }
 /* início de tramo (ancoragem): marca quase invisível */
 .torres-tabela tr.ancoragem td { border-top: 1px solid rgba(254,107,0,.22); }
 .torres-tabela th { top: 0; }

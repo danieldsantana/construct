@@ -1,4 +1,4 @@
-import { useMemo } from 'react';
+import { useEffect, useMemo } from 'react';
 import { useSearchParams } from 'react-router';
 import { COMPOSICAO, formatarMetros, statusDaTorre, useLinhas, useStatusAuto, useTorreComponentes, useTorres, type ClasseStatus, type Torre, type TorreComponente } from '../dados/torres';
 import { useEscopo } from '../lib/escopo';
@@ -35,6 +35,14 @@ export function Torres({ aba }: { aba: Aba }) {
   const ordem = params.get('ordem') === 'seq' ? 'seq' : 'torre';
   const vistaMapa = params.get('vista') === 'tramo' ? 'tramo' : 'continuo';
   const selId = Number(params.get('torre')) || null;
+  // Esc tira a marca da torre mesmo com a ficha fechada (a marca fica no endereço da página)
+  useEffect(() => {
+    if (!selId) return;
+    const esc = (e: KeyboardEvent) => { if (e.key === 'Escape') mudar('torre', ''); };
+    window.addEventListener('keydown', esc);
+    return () => window.removeEventListener('keydown', esc);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selId]);
 
   function mudar(chave: string, valor: string) {
     const p = new URLSearchParams(params);
@@ -115,10 +123,10 @@ export function Torres({ aba }: { aba: Aba }) {
       )}
 
       {aba === 'lista'
-        ? <Lista torres={visiveis} cores={cores} completas={completas} ordem={ordem} selId={selId} abrir={(id) => mudar('torre', String(id))} escolherTramo={(t) => mudar('tramo', `${t.linha_sigla}-${t.tramo}`)} />
+        ? <Lista torres={visiveis} cores={cores} completas={completas} ordem={ordem} selId={selId} abrir={(id) => mudar('torre', id === selId ? '' : String(id))} escolherTramo={(t) => mudar('tramo', `${t.linha_sigla}-${t.tramo}`)} />
         : vistaMapa === 'continuo'
-          ? <MapaContinuo torres={visiveis} selId={selId} abrir={(id) => mudar('torre', String(id))} />
-          : <Mapa torres={visiveis} selId={selId} abrir={(id) => mudar('torre', String(id))} />}
+          ? <MapaContinuo torres={visiveis} selId={selId} abrir={(id) => mudar('torre', id === selId ? '' : String(id))} />
+          : <Mapa torres={visiveis} selId={selId} abrir={(id) => mudar('torre', id === selId ? '' : String(id))} />}
 
       <FichaTorre t={sel} cores={cores} aoFechar={() => mudar('torre', '')} />
     </div>
