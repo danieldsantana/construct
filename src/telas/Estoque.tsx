@@ -1,4 +1,4 @@
-import { useMemo } from 'react';
+import { useMemo, useState, type MouseEvent } from 'react';
 import { useSearchParams } from 'react-router';
 import { Abas, Porcentagem, Titulo } from '../componentes/Titulo';
 import { useEscopo } from '../lib/escopo';
@@ -7,6 +7,17 @@ import { useEstoqueParte, useSaldos, type EstoqueParte, type Saldo } from '../da
 import './Estoque.css';
 
 type Aba = 'volumes' | 'fixadores';
+
+// Destaque em cruz: a linha sob o mouse (CSS :hover) e a coluna (índice da célula, via data-col na tabela).
+function useColunaSobMouse() {
+  const [col, setCol] = useState<number | null>(null);
+  const sobre = (e: MouseEvent<HTMLTableElement>) => {
+    const td = (e.target as HTMLElement).closest('td');
+    const tr = td?.parentElement;
+    setCol(td && tr && !tr.classList.contains('faixa') && !tr.classList.contains('vols') && td.closest('table') === e.currentTarget ? td.cellIndex : null);
+  };
+  return { 'data-col': col ?? undefined, onMouseOver: sobre, onMouseLeave: () => setCol(null) };
+}
 const n = (v: number | string | null | undefined) => Number(v ?? 0);
 
 // Estoque = VOLUMES RECEBIDOS (layout do controle) e fixadores, só do que tem previsto no escopo.
@@ -81,6 +92,7 @@ type Grupo = { chave: string; linha: string; canteiro: string; tipo: string; vol
 export function Volumes({ saldos, est, varios, tipos, soFalta, mudar }: {
   saldos: Saldo[]; est: EstoqueParte[]; varios: boolean; tipos: string[]; soFalta: boolean; mudar: (k: string, v: string) => void;
 }) {
+  const cruz = useColunaSobMouse();
   const porParte = useMemo(() => new Map(est.map((x) => [`${x.linha}|${x.canteiro}|${x.tipo}|${x.parte}`, x])), [est]);
   const grupos = useMemo(() => {
     const m = new Map<string, Grupo>();
@@ -117,7 +129,7 @@ export function Volumes({ saldos, est, varios, tipos, soFalta, mudar }: {
       <section className="panel estoque-painel">
         <div className="tramo-h"><b>RECEBIMENTO POR VOLUME</b><span className="muted">{titulo.toUpperCase()}</span></div>
         <div className="estoque-tabela">
-          <table className="est vr">
+          <table className="est vr cruz" {...cruz}>
             <thead>
               <tr>
                 <th rowSpan={2}>Parte - matriz</th><th rowSpan={2}>Parte</th>
@@ -177,6 +189,7 @@ export function Volumes({ saldos, est, varios, tipos, soFalta, mudar }: {
 }
 
 export function Fixadores({ fixadores, varios, soFalta, mudar }: { fixadores: Saldo[]; varios: boolean; soFalta: boolean; mudar: (k: string, v: string) => void }) {
+  const cruz = useColunaSobMouse();
   const lista = fixadores
     .filter((f) => !soFalta || n(f.recebido) < n(f.previsto))
     .sort((a, b) => a.linha.localeCompare(b.linha) || a.canteiro.localeCompare(b.canteiro) || a.ordem - b.ordem);
@@ -192,7 +205,7 @@ export function Fixadores({ fixadores, varios, soFalta, mudar }: { fixadores: Sa
       <section className="panel estoque-painel">
         <div className="tramo-h"><b>FIXADORES</b><span className="muted num">{lista.length} itens</span></div>
         <div className="estoque-tabela">
-          <table className="est">
+          <table className="est cruz" {...cruz}>
             <thead><tr>
               <th className="esq">Seção</th><th className="esq">Fixador</th><th>Previsto</th><th>Recebido</th><th>Saldo</th><th>Atendido</th>
               {varios && <th className="g0">Canteiro</th>}
