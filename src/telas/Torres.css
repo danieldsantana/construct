@@ -6,8 +6,6 @@
 
 .torres-tabela { overflow: auto; max-height: calc(100vh - 300px); }
 .torres-tabela table.lista td { padding: 3px 8px; font-size: 13px; white-space: nowrap; }
-.torres-tabela table.lista tbody tr { cursor: pointer; }
-.torres-tabela table.lista tbody tr:hover td { background: var(--navy-tint); }
 .torres-tabela table.lista tbody tr.sel td { background: var(--orange-tint); }
 /* início de tramo (ancoragem): marca quase invisível */
 .torres-tabela tr.ancoragem td { border-top: 1px solid rgba(254,107,0,.22); }
@@ -56,12 +54,12 @@ main:has(> .torres.cheia) { overflow: hidden; padding-bottom: 12px; display: fle
 /* pintura da LISTA: verde = completo, vermelho = falta (tons suaves, no visual da ferramenta) */
 .torres-tabela table.lista td.pint-ok, .drawer td.pint-ok { background: #bfe6cb; color: #0f5a2c; font-weight: 600; }
 .torres-tabela table.lista td.pint-falta, .drawer td.pint-falta { background: #f6c4bf; color: #8f1d15; font-weight: 600; }
-.torres-tabela table.lista tbody tr:hover td.pint-ok { background: #a9dcb9; }
-.torres-tabela table.lista tbody tr:hover td.pint-falta { background: #efaea7; }
 /* célula sem componente: apagada, não chama atenção */
 .torres-tabela table.lista td.vazio { background: #fbfbfc; border-color: #f3f4f6; }
-.torres-tabela table.lista tbody tr:hover td.vazio { background: #f3f5f9; }
 .torres-tabela table.lista td.g0.vazio { border-left: 2px solid var(--line); }  /* mantém a divisa grossa entre grupos */
 
 /* Mapa contínuo: 24 torres por linha, mesma célula da visão por tramo */
 .mapa-grade { display: grid; grid-template-columns: repeat(24, 60px); gap: 5px; padding: 8px 10px 10px; overflow-x: auto; }
+/* número da torre abre a ficha; as demais células selecionam (cruz como no Estoque) */
+.torres-tabela table.lista td.tnum { cursor: pointer; }
+.torres-tabela table.lista td.tnum:hover { background: var(--navy-2); }

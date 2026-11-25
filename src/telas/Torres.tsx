@@ -4,6 +4,7 @@ import { COMPOSICAO, formatarMetros, statusDaTorre, useLinhas, useStatusAuto, us
 import { useEscopo } from '../lib/escopo';
 import { num } from '../lib/formato';
 import { Titulo } from '../componentes/Titulo';
+import { ResumoSelecao, useColunaSobMouse, useSelecao } from '../componentes/TabelaCruz';
 import { Gaveta } from '../componentes/Gaveta';
 import './Torres.css';
 
@@ -158,6 +159,8 @@ export function Lista({ torres, cores, completas, ordem, selId, abrir, escolherT
     if (ordem === 'seq') for (const g of m.values()) g.sort((a, b) => (a.sequencia ?? 1e9) - (b.sequencia ?? 1e9) || a.ordem - b.ordem);
     return [...m];
   }, [torres, ordem]);
+  const cruz = useColunaSobMouse();
+  const selecao = useSelecao();
   if (!torres.length) return <p className="muted">Nenhuma torre neste recorte.</p>;
   const comp = COMPOSICAO.filter((g) => torres.some((t) => t.categoria === (g.grupo === 'AUTOPORTANTE' ? 'autoportante' : 'estaiada')));
   const varios = grupos.length > 1;
@@ -173,10 +176,11 @@ export function Lista({ torres, cores, completas, ordem, selId, abrir, escolherT
         <b>{titulo.toUpperCase()}</b>
         <span className="muted num">{torres.length} torres</span>
         <span className="grow" />
+        <ResumoSelecao r={selecao.resumo} />
         {abas.length > 0 && <span className="muted" style={{ fontSize: 12 }}>{abas.join(' · ')}</span>}
       </div>
       <div className="torres-tabela">
-        <table className="lista">
+        <table className="lista cruz" {...cruz} ref={selecao.ref} onMouseDown={selecao.onMouseDown} onMouseOver={(e) => { cruz.onMouseOver(e); selecao.onMouseOver(e); }}>
           <thead>
             <tr>
               <th rowSpan={2} className="r">Seq.</th><th rowSpan={2}>Torre</th><th rowSpan={2}>Tipo</th>
@@ -189,9 +193,9 @@ export function Lista({ torres, cores, completas, ordem, selId, abrir, escolherT
           <tbody>
             {grupos.flatMap(([nome, ts], gi) => ts.map((t, i) => (
               <tr key={t.id} className={`${t.ancoragem ? 'ancoragem' : ''} ${t.id === selId ? 'sel' : ''} ${gi > 0 && i === 0 ? 'divisa' : ''}`}
-                  onClick={() => abrir(t.id)} title={varios && i === 0 ? nome : undefined}>
+                  data-k={t.id} title={varios && i === 0 ? nome : undefined}>
                 <td className="r num">{t.sequencia ?? ''}</td>
-                <td className="tnum">{t.numero}</td>
+                <td className="tnum" onClick={() => abrir(t.id)} title="Abrir ficha da torre">{t.numero}</td>
                 <td className="tipo">{t.tipo}{t.ancoragem && <span className="marca" title={t.arranjo_ferragens ?? ''}>anc.</span>}</td>
                 <td className="r num">{formatarMetros(t.altura_util)}</td>
                 <td className="r num">
