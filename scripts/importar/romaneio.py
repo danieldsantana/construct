@@ -16,6 +16,7 @@ LINHA = re.compile(
     r"\n(\d+)\n(\d{8,10})\n(\d{10})\n(\d{6,})\n([^\n]*)\n(FD|CM|[A-Z]{2})\n(\d+)\n(\d+)[ \n](.+?)"
     r"\n(\d+(?:\.\d{3})*(?:,\d+)?)\n(\d+(?:\.\d{3})*(?:,\d+)?)\n(\d+(?:\.\d{3})*(?:,\d+)?)(?=\n)", re.S)
 VOLUMES = re.compile(r"\n(\d+)\n([A-Z]+)\n([\d.]+,\d+)\n([\d.]+,\d+)\nCFOP")
+PESO_PROTHEUS = re.compile(r"PESO L[IÍ]QUIDO\n([\d.]+,\d+)\n")
 
 
 def br(s: str) -> float:
@@ -35,6 +36,7 @@ def ler_pdf(caminho: Path) -> dict:
     oc = re.search(r"OC:\s*(.*?)\s+N[úu]mero Contrato", danfe) or re.search(r"(OF-[^\n]*?)\s+ROMANEIO:", danfe)
     rem = re.search(r"REMESSA:\s*(\d+)", danfe) or re.search(r"ROMANEIO:\s*(\d+)", danfe)
     vol = VOLUMES.search(danfe)
+    liq = PESO_PROTHEUS.search(danfe) if not vol else None  # DANFE Protheus: "PESO LIQUIDO\n4,986"
     itens = []
     for pg, t in enumerate(paginas):
         if "ROMANEIO" not in t[:200]:
@@ -49,7 +51,8 @@ def ler_pdf(caminho: Path) -> dict:
         itens = [i for i in itens if i["remessa"] == remessa]
     return {"nf": nf.group(1).lstrip("0") if nf else None, "oc": " ".join(oc.group(1).split()) if oc else None,
             "remessa": remessa, "volumes": int(vol.group(1)) if vol else None, "especie": vol.group(2) if vol else None,
-            "peso_bruto": br(vol.group(3)) if vol else None, "peso_liquido": br(vol.group(4)) if vol else None,
+            "peso_bruto": br(vol.group(3)) if vol else None,
+            "peso_liquido": br(vol.group(4)) if vol else (br(liq.group(1)) if liq else None),
             "romaneio": itens}
 
 

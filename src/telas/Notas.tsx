@@ -5,7 +5,7 @@ import { Gaveta } from '../componentes/Gaveta';
 import { useEscopo } from '../lib/escopo';
 import { colunaDaOrigem, data, num } from '../lib/formato';
 import {
-  useLancamentos, useNotasFiscais, useRecebimentos, useSaldos,
+  useConferenciaNF, useLancamentos, useLeituraRomaneio, useNotasFiscais, useRecebimentos, useSaldos,
   type NotaFiscal, type Recebimento, type SituacaoNF,
 } from '../dados/recebimento';
 
@@ -266,6 +266,7 @@ function FichaNF({ nf, recebimentos, aoFechar }: { nf: NotaFiscal | null; recebi
             <div><span>SAC / RNC</span><b>{[nf.sac && `SAC ${nf.sac}`, nf.rnc && `RNC ${nf.rnc}`].filter(Boolean).join(' · ') || '—'}</b></div>
             <div style={{ gridColumn: '1 / -1' }}><span>Arquivo</span><b style={{ fontSize: 13 }}>{nf.arquivo ?? 'sem PDF no índice'}</b></div>
           </div>
+          <RomaneioXLancado nfId={nf.id} recebida={!!nf.recebida_em} />
           <h2>Itens recebidos</h2>
           <ItensDosMovimentos movimentos={movs} />
         </>
@@ -288,5 +289,39 @@ function FichaRecebimento({ r, aoFechar }: { r: Recebimento | null; aoFechar: ()
         </>
       )}
     </Gaveta>
+  );
+}
+
+// Romaneio do PDF (SKU → volume da matriz) × o que foi lançado para a NF (ENTRADA do controle ou lançamento do app).
+function RomaneioXLancado({ nfId, recebida }: { nfId: number; recebida: boolean }) {
+  const conf = useConferenciaNF();
+  const leitura = useLeituraRomaneio();
+  const l = leitura.dados.find((x) => x.id === nfId);
+  const linhas = conf.dados.filter((c) => c.nota_fiscal_id === nfId).sort((a, b) => (a.volume ?? '~').localeCompare(b.volume ?? '~'));
+  if (conf.carregando || leitura.carregando) return null;
+  if (!l || l.romaneio_confere === null) return <p className="muted" style={{ fontSize: 13 }}>Romaneio: PDF não lido.</p>;
+  if (!l.romaneio_confere) return <p className="muted" style={{ fontSize: 13 }}>Romaneio do PDF não conferido ({l.romaneio_obs}); sem comparação.</p>;
+  const difs = linhas.filter((c) => Number(c.qtd_romaneio) !== Number(c.qtd_lancada));
+  return (
+    <>
+      <h2>Romaneio × lançado</h2>
+      {!recebida
+        ? <p className="muted" style={{ fontSize: 13 }}>Romaneio lido e conferido com o peso{l.peso_danfe ? ` do DANFE (${num(l.peso_danfe, 1)} kg)` : ''}; a NF ainda não foi lançada.</p>
+        : <div className={difs.length ? 'callout' : 'notes'}>{difs.length ? `${difs.length} volume(s) com diferença entre o romaneio e o lançado.` : 'Lançado igual ao romaneio em todos os volumes.'}</div>}
+      <table>
+        <thead><tr><th>Volume (matriz)</th><th className="r">Romaneio</th><th className="r">Lançado</th></tr></thead>
+        <tbody>{linhas.map((c, i) => {
+          const dif = Number(c.qtd_romaneio) !== Number(c.qtd_lancada);
+          return (
+            <tr key={i}>
+              <td>{c.volume ?? <span className="muted">sem ligação com a matriz</span>}</td>
+              <td className={`r num ${dif ? 'warn' : ''}`}>{num(c.qtd_romaneio)}</td>
+              <td className={`r num ${dif ? 'warn' : ''}`}>{num(c.qtd_lancada)}</td>
+            </tr>
+          );
+        })}</tbody>
+      </table>
+      <p className="muted" style={{ fontSize: 12 }}>Só volumes de estrutura; fixadores avulsos e peças (POS) ainda sem de-para. "Sem ligação": volume cuja numeração/peso no controle não bate com a matriz.</p>
+    </>
   );
 }

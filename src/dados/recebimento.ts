@@ -78,3 +78,11 @@ export type EstoqueParte = {
 export const useEstoqueParte = () =>
   useTabela<EstoqueParte>('estoque_parte', 'linha, canteiro, tipo, parte, conjunto, previsto, torres, atendidas, ultima_atendida, proxima_torre, proxima_seq',
     ['linha', 'canteiro', 'tipo', 'parte']);
+
+// Romaneio do PDF × lançado, por volume da matriz (só NFs cujo romaneio conferiu com o peso do DANFE/ENTRADA)
+export type ConferenciaNF = { nota_fiscal_id: number; volume: string | null; qtd_romaneio: number; qtd_lancada: number };
+export const useConferenciaNF = () =>
+  useTabela<ConferenciaNF>('nf_conferencia', 'nota_fiscal_id, volume, qtd_romaneio, qtd_lancada', ['nota_fiscal_id', 'volume']);
+export type LeituraRomaneio = { id: number; romaneio_confere: boolean | null; romaneio_obs: string | null; peso_danfe: number | null };
+export const useLeituraRomaneio = () =>
+  useTabela<LeituraRomaneio>('nota_fiscal', 'id, romaneio_confere, romaneio_obs, peso_danfe', ['id']);
