@@ -204,13 +204,9 @@ function PlanilhaEntrada({ pares, recebimentos, aoAbrir, aoAbrirNF }: {
   const cab: [string, (c: Recebimento) => ReactNode][] = [
     ...(varios ? [['Canteiro', (c: Recebimento) => (variasLinhas ? `${c.linha} · ${c.canteiro}` : c.canteiro)] as [string, (c: Recebimento) => ReactNode]] : []),
     ['Data de recebimento', (c) => data(c.data)],
-    ['Fornecedor', (c) => c.fornecedor ?? (c.tipo === 'transferencia' ? 'TRANSFERÊNCIA' : '')],
     ['Nota fiscal', (c) => <button className="link" onClick={() => (c.nf_id ? aoAbrirNF(c.nf_id) : aoAbrir(c))}>{doc(c)}</button>],
     ['Data de emissão', (c) => data(c.emissao)],
     ['Romaneio', (c) => c.romaneio ?? ''],
-    ['Valor NF', (c) => (c.valor ? num(c.valor, 2) : '')],
-    ['Peso NF', (c) => (c.peso ? num(c.peso, 1) : '')],
-    ['OF', (c) => c.of_texto ?? ''],
   ];
   let secao = '';
   return (
