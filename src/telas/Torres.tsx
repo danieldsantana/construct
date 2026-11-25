@@ -201,9 +201,9 @@ export function Lista({ torres, cores, completas, ordem, selId, abrir, escolherT
             {grupos.flatMap(([nome, ts], gi) => ts.map((t, i) => (
               <tr key={t.id} className={`${t.ancoragem ? 'ancoragem' : ''} ${t.id === selId ? 'sel' : ''} ${gi > 0 && i === 0 ? 'divisa' : ''}`}
                   data-k={t.id} title={varios && i === 0 ? nome : undefined}
-                  onClick={(e) => { if (!(e.target as HTMLElement).closest('button') && t.id !== selId) abrir(t.id); }}>
+                  onDoubleClick={(e) => { if (!(e.target as HTMLElement).closest('button') && t.id !== selId) abrir(t.id); }}>
                 <td className="r num">{t.sequencia ?? ''}</td>
-                <td className="tnum" onClick={(e) => { if (t.id === selId) { e.stopPropagation(); abrir(t.id); } }} title={t.id === selId ? 'Fechar ficha' : 'Abrir ficha da torre'}>{t.numero}</td>
+                <td className="tnum" title="Duplo clique abre a ficha da torre">{t.numero}</td>
                 <td className="tipo">{t.tipo}{t.ancoragem && <span className="marca" title={t.arranjo_ferragens ?? ''}>anc.</span>}</td>
                 <td className="r num">{formatarMetros(t.altura_util)}</td>
                 <td className="r num">
