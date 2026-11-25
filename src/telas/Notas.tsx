@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react';
 import { useSearchParams } from 'react-router';
 import { Abas, Titulo } from '../componentes/Titulo';
 import { Gaveta } from '../componentes/Gaveta';
@@ -30,7 +30,7 @@ const dias = (iso: string | null) => (iso ? Math.floor((HOJE.getTime() - new Dat
 
 // Notas fiscais: todas as emitidas (índice dos PDFs) e recebidas (controles), mais transferências e ajustes.
 export function Notas() {
-  const { inclui, escopo, canteiroUnico } = useEscopo();
+  const { inclui, escopo } = useEscopo();
   const nfs = useNotasFiscais();
   const rec = useRecebimentos();
   const [vista, setVista] = useState<Vista>('lista');
@@ -61,6 +61,16 @@ export function Notas() {
     ...rec.dados.filter((r) => r.tipo !== 'recebimento' && inclui(r.linha, r.canteiro))
       .map((mov) => ({ k: 'mov' as const, id: `m${mov.id}`, mov, quando: mov.data ?? '' })),
   ], [nfs.dados, rec.dados, nfNoEscopo, inclui]);
+
+  const paresEscopo = useMemo(() => {
+    const vistos = new Map<string, { linha: string; canteiro: string; id: number }>();
+    for (const r of rec.dados) {
+      if (!inclui(r.linha, r.canteiro)) continue;
+      const k = `${r.linha}|${r.canteiro}`;
+      if (!vistos.has(k)) vistos.set(k, { linha: r.linha, canteiro: r.canteiro, id: r.canteiro_id });
+    }
+    return [...vistos.values()].sort((a, b) => a.linha.localeCompare(b.linha) || a.id - b.id).map(({ linha, canteiro }) => ({ linha, canteiro }));
+  }, [rec.dados, inclui]);
 
   const passa = (l: Linha, f: Filtro) => {
     if (f === 'todas') return true;
@@ -139,11 +149,9 @@ export function Notas() {
             </table>
           </div>
         </>
-      ) : canteiroUnico ? (
-        <PlanilhaEntrada linha={canteiroUnico.linha} canteiro={canteiroUnico.canteiro} aoAbrir={setAbertoMov}
-                         recebimentos={rec.dados.filter((r) => inclui(r.linha, r.canteiro))} />
       ) : (
-        <div className="callout">A planilha de entrada é por canteiro, como no controle. Escolha uma linha e um canteiro na barra de escopo.</div>
+        <PlanilhaEntrada pares={paresEscopo} aoAbrir={setAbertoMov} aoAbrirNF={(id) => setAbertaNF(nfs.dados.find((x) => x.id === id) ?? null)}
+                         recebimentos={rec.dados.filter((r) => inclui(r.linha, r.canteiro))} />
       )}
 
       <FichaNF nf={abertaNF} recebimentos={rec.dados} aoFechar={fechar} />
@@ -152,13 +160,23 @@ export function Notas() {
   );
 }
 
-function PlanilhaEntrada({ linha, canteiro, recebimentos, aoAbrir }: { linha: string; canteiro: string; recebimentos: Recebimento[]; aoAbrir: (r: Recebimento) => void }) {
+// Planilha de entrada como a aba ENTRADA do controle: cabeçalho completo por coluna (data de recebimento, fornecedor, NF,
+// emissão, romaneio, valor, peso, OF) e uma coluna por recebimento. Com vários canteiros no escopo, uma linha a mais no
+// cabeçalho diz o canteiro de recebimento de cada coluna, e previsto/recebido são a soma dos canteiros.
+function PlanilhaEntrada({ pares, recebimentos, aoAbrir, aoAbrirNF }: {
+  pares: { linha: string; canteiro: string }[]; recebimentos: Recebimento[]; aoAbrir: (r: Recebimento) => void; aoAbrirNF: (nfId: number) => void;
+}) {
   const saldos = useSaldos();
   const lanc = useLancamentos();
   const [todas, setTodas] = useState(false);
+  const varios = pares.length > 1;
+  const variasLinhas = new Set(pares.map((p) => p.linha)).size > 1;
+  const pos = (l: string, c: string) => pares.findIndex((p) => p.linha === l && p.canteiro === c);
 
-  const colunas = useMemo(() => recebimentos.filter((r) => r.linha === linha && r.canteiro === canteiro)
-    .sort((a, b) => colunaDaOrigem(a.origem) - colunaDaOrigem(b.origem)), [recebimentos, linha, canteiro]);
+  const colunas = useMemo(() => recebimentos.filter((r) => pos(r.linha, r.canteiro) >= 0)
+    .sort((a, b) => pos(a.linha, a.canteiro) - pos(b.linha, b.canteiro) || colunaDaOrigem(a.origem) - colunaDaOrigem(b.origem)),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [recebimentos, pares]);
   const mostrar = todas ? colunas : colunas.slice(-25);
   const qtd = useMemo(() => {
     const ids = new Set(colunas.map((c) => c.id));
@@ -166,31 +184,58 @@ function PlanilhaEntrada({ linha, canteiro, recebimentos, aoAbrir }: { linha: st
     for (const l of lanc.dados) if (ids.has(l.movimento_id)) m.set(`${l.material_id}|${l.movimento_id}`, Number(l.quantidade));
     return m;
   }, [lanc.dados, colunas]);
-  const itens = useMemo(() => saldos.dados
-    .filter((s) => s.linha === linha && s.canteiro === canteiro && (Number(s.previsto) !== 0 || Number(s.recebido) !== 0))
-    .sort((a, b) => a.ordem - b.ordem), [saldos.dados, linha, canteiro]);
+  const itens = useMemo(() => {
+    const m = new Map<number, { material_id: number; secao: string; descricao: string; unidade: string; ordem: number; previsto: number; recebido: number }>();
+    for (const s of saldos.dados) {
+      if (pos(s.linha, s.canteiro) < 0 || (Number(s.previsto) === 0 && Number(s.recebido) === 0)) continue;
+      const a = m.get(s.material_id) ?? { material_id: s.material_id, secao: s.secao, descricao: s.descricao, unidade: s.unidade, ordem: s.ordem, previsto: 0, recebido: 0 };
+      a.previsto += Number(s.previsto); a.recebido += Number(s.recebido);
+      m.set(s.material_id, a);
+    }
+    return [...m.values()].sort((a, b) => a.ordem - b.ordem);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [saldos.dados, pares]);
 
   if (saldos.carregando || lanc.carregando) return <p className="muted">Carregando…</p>;
   if (saldos.erro || lanc.erro) return <p className="warn">Não foi possível carregar: {saldos.erro ?? lanc.erro}</p>;
-  if (!colunas.length) return <div className="callout">Nenhum recebimento importado para {linha} · {canteiro}.</div>;
+  if (!colunas.length) return <div className="callout">Nenhum recebimento lançado neste escopo.</div>;
 
+  const doc = (c: Recebimento) => c.numero ?? (c.tipo === 'ajuste' ? 'Ajuste' : c.documento ?? 'Transferência');
+  const cab: [string, (c: Recebimento) => ReactNode][] = [
+    ...(varios ? [['Canteiro', (c: Recebimento) => (variasLinhas ? `${c.linha} · ${c.canteiro}` : c.canteiro)] as [string, (c: Recebimento) => ReactNode]] : []),
+    ['Data de recebimento', (c) => data(c.data)],
+    ['Fornecedor', (c) => c.fornecedor ?? (c.tipo === 'transferencia' ? 'TRANSFERÊNCIA' : '')],
+    ['Nota fiscal', (c) => <button className="link" onClick={() => (c.nf_id ? aoAbrirNF(c.nf_id) : aoAbrir(c))}>{doc(c)}</button>],
+    ['Data de emissão', (c) => data(c.emissao)],
+    ['Romaneio', (c) => c.romaneio ?? ''],
+    ['Valor NF', (c) => (c.valor ? num(c.valor, 2) : '')],
+    ['Peso NF', (c) => (c.peso ? num(c.peso, 1) : '')],
+    ['OF', (c) => c.of_texto ?? ''],
+  ];
   let secao = '';
   return (
     <>
       <div className="toolbar">
-        <span className="muted">{mostrar.length} de {colunas.length} colunas, na ordem do controle · só itens com previsto ou recebimento · clique no número da NF para abrir</span>
+        <span className="muted">{mostrar.length} de {colunas.length} colunas, na ordem do controle{varios ? ', canteiro a canteiro' : ''} · só itens com previsto ou recebimento</span>
         <button onClick={() => setTodas(!todas)}>{todas ? 'Só as 25 últimas' : 'Todas as colunas'}</button>
       </div>
       <div className="panel planilha" style={{ overflow: 'auto', maxHeight: 'calc(100vh - 300px)' }}>
         <table>
-          <thead><tr>
-            <th className="stk">Descrição</th><th className="r">Previsto</th><th className="r">Recebido</th>
-            {mostrar.map((c) => (
-              <th key={c.id} className="nfcol" title={`${c.of_texto ?? ''} · recebida ${data(c.data)}`} onClick={() => aoAbrir(c)}>
-                <span>{c.numero ?? (c.tipo === 'ajuste' ? 'COL. E' : 'TRANSF.')}</span><small>{data(c.data, true)}</small>
-              </th>
+          <thead>
+            {cab.map(([rot, f], i) => (
+              <tr key={rot} className={`cab ${rot === 'Canteiro' ? 'cab-cant' : ''}`}>
+                <th className="stk rot">{rot}</th><th /><th />
+                {mostrar.map((c, j) => {
+                  const nova = varios && rot === 'Canteiro' && (j === 0 || mostrar[j - 1].canteiro !== c.canteiro || mostrar[j - 1].linha !== c.linha);
+                  return <td key={c.id} className={`cabv ${i === cab.length - 1 ? 'ult' : ''} ${nova ? 'nova' : ''}`}>{f(c)}</td>;
+                })}
+              </tr>
             ))}
-          </tr></thead>
+            <tr className="tit">
+              <th className="stk">Descrição</th><th className="r">Previsto</th><th className="r">Recebido</th>
+              {mostrar.map((c) => <th key={c.id} className="nfcol" title={`${doc(c)} · ${c.canteiro}`} onClick={() => aoAbrir(c)}>{c.tipo === 'recebimento' ? 'NF' : c.tipo === 'ajuste' ? 'AJ.' : 'TR.'}</th>)}
+            </tr>
+          </thead>
           <tbody>
             {itens.flatMap((s) => {
               const out = [];
@@ -198,7 +243,7 @@ function PlanilhaEntrada({ linha, canteiro, recebimentos, aoAbrir }: { linha: st
                 secao = s.secao;
                 out.push(<tr key={`s${s.material_id}`} className="sec"><td colSpan={3 + mostrar.length}>{s.secao}</td></tr>);
               }
-              const falta = Number(s.recebido) < Number(s.previsto);
+              const falta = s.recebido < s.previsto;
               out.push(
                 <tr key={s.material_id}>
                   <td className="stk">{s.descricao}</td>

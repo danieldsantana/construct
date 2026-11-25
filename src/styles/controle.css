@@ -310,3 +310,13 @@ button.pri:disabled { opacity: .5; }
 .lancar-grade td { padding: 3px 8px; font-size: 13px; }
 .lancar-grade th.nfcolh { background: var(--orange); }
 .lancar-grade input.qtd { width: 80px; text-align: right; background: var(--orange-tint); border-color: #f3c9a6; }
+
+/* planilha de entrada: cabeçalho completo (como a ENTRADA), só a linha de títulos fica presa no topo */
+.planilha thead tr.cab th, .planilha thead tr.cab td { position: static; }
+.planilha thead tr.cab th.rot { position: sticky; left: 0; z-index: 2; background: var(--navy-2); text-transform: none; font-size: 11.5px; text-align: right; }
+.planilha thead tr.cab td.cabv { background: #fff3e8; font-size: 12px; text-align: center; white-space: nowrap; border-color: #f3dcc8; }
+.planilha thead tr.cab-cant td.cabv { background: var(--navy-tint); color: var(--navy); font-weight: 700; }
+.planilha thead tr.cab-cant td.cabv.nova { box-shadow: inset 2px 0 0 var(--navy); }
+.planilha thead tr.cab th:not(.rot) { background: var(--navy-2); }
+.planilha thead tr.tit th { top: 0; }
+.planilha thead tr.tit th.nfcol { font-size: 11px; }
