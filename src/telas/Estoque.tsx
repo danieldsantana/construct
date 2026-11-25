@@ -93,6 +93,7 @@ export function Volumes({ saldos, est, varios, tipos, soFalta, mudar }: {
   saldos: Saldo[]; est: EstoqueParte[]; varios: boolean; tipos: string[]; soFalta: boolean; mudar: (k: string, v: string) => void;
 }) {
   const cruz = useColunaSobMouse();
+  const [parteSob, setParteSob] = useState<string | null>(null);  // conjunto completo sob o mouse
   const porParte = useMemo(() => new Map(est.map((x) => [`${x.linha}|${x.canteiro}|${x.tipo}|${x.parte}`, x])), [est]);
   const grupos = useMemo(() => {
     const m = new Map<string, Grupo>();
@@ -166,14 +167,14 @@ export function Volumes({ saldos, est, varios, tipos, soFalta, mudar }: {
                     const conj = n(e?.conjunto);
                                     const dica = e?.torres ? `Atende ${e.atendidas} de ${e.torres} torres na sequência de ataque` + (e.proxima_torre ? ` · próxima: ${e.proxima_torre} (seq. ${e.proxima_seq ?? '—'})` : '') : '';
                     return vs.map((v, i) => (
-                      <tr key={v.material_id} className={i === 0 ? 'ini-parte' : ''}>
+                      <tr key={v.material_id} className={`${i === 0 ? 'ini-parte' : ''} ${parteSob === `${g.chave}|${parte}` ? 'grupo-hl' : ''}`}>
                         <td className="esq">{v.descricao}</td>
                         <td className="esq parte">{parte}</td>
                         <td className="g0">{num(v.previsto)}</td><td>{num(v.peso_unit, 2)}</td><td>{num(n(v.previsto) * n(v.peso_unit), 2)}</td>
                         <td className={`g0 ${n(v.recebido) >= n(v.previsto) ? 'rec-ok' : n(v.recebido) > 0 ? 'rec-parc' : ''}`}>{n(v.recebido) ? num(v.recebido) : '-'}</td>
                         <td>{n(v.recebido) ? num(n(v.recebido) * n(v.peso_unit), 2) : '-'}</td>
                         {i === 0 && (
-                          <td rowSpan={vs.length} className="g0 conj" title={dica}>{num(conj)}</td>
+                          <td rowSpan={vs.length} className="g0 conj" title={dica} onMouseEnter={() => setParteSob(`${g.chave}|${parte}`)} onMouseLeave={() => setParteSob(null)}>{num(conj)}</td>
                         )}
                       </tr>
                     ));

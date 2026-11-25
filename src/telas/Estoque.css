@@ -66,8 +66,8 @@ table.est thead th { text-align: center !important; box-shadow: inset -1px 0 0 r
 table.est thead th:last-child { box-shadow: inset 0 -1px 0 rgba(255,255,255,.35); }
 
 /* destaque em cruz (linha e coluna sob o mouse): camada translúcida, mantém as cores das células */
-table.cruz { --hl: linear-gradient(rgba(0, 46, 109, .07), rgba(0, 46, 109, .07)); }
-table.cruz tbody tr:not(.faixa):hover > td { background-image: linear-gradient(rgba(0, 46, 109, .09), rgba(0, 46, 109, .09)); }
+table.cruz { --hl: linear-gradient(rgba(0, 46, 109, .035), rgba(0, 46, 109, .035)); }
+table.cruz tbody tr:not(.faixa):hover > td { background-image: linear-gradient(rgba(0, 46, 109, .045), rgba(0, 46, 109, .045)); }
 table.cruz[data-col="0"] tbody tr:not(.faixa) > td:nth-child(1),
 table.cruz[data-col="1"] tbody tr:not(.faixa) > td:nth-child(2),
 table.cruz[data-col="2"] tbody tr:not(.faixa) > td:nth-child(3),
@@ -88,4 +88,6 @@ table.cruz[data-col="5"] tbody tr:not(.faixa):hover > td:nth-child(6),
 table.cruz[data-col="6"] tbody tr:not(.faixa):hover > td:nth-child(7),
 table.cruz[data-col="7"] tbody tr:not(.faixa):hover > td:nth-child(8),
 table.cruz[data-col="8"] tbody tr:not(.faixa):hover > td:nth-child(9),
-table.cruz[data-col="9"] tbody tr:not(.faixa):hover > td:nth-child(10) { background-image: linear-gradient(rgba(0, 46, 109, .16), rgba(0, 46, 109, .16)); }
+table.cruz[data-col="9"] tbody tr:not(.faixa):hover > td:nth-child(10) { background-image: linear-gradient(rgba(0, 46, 109, .08), rgba(0, 46, 109, .08)); }
+/* mouse sobre o conjunto completo: todas as linhas daquela parte */
+table.cruz tbody tr.grupo-hl > td { background-image: linear-gradient(rgba(0, 46, 109, .045), rgba(0, 46, 109, .045)); }
