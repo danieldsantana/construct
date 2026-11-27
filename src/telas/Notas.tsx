@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useLayoutEffect, useMemo, useState, type ReactNode } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { createPortal } from 'react-dom';
 import { useSearchParams } from 'react-router';
 import { Abas, Titulo } from '../componentes/Titulo';
@@ -202,14 +202,49 @@ export function Notas() {
 // Planilha de entrada como a aba ENTRADA do controle: cabeçalho completo por coluna (data de recebimento, fornecedor, NF,
 // emissão, romaneio, valor, peso, OF) e uma coluna por recebimento. Com vários canteiros no escopo, uma linha a mais no
 // cabeçalho diz o canteiro de recebimento de cada coluna, e previsto/recebido são a soma dos canteiros.
-function PlanilhaEntrada({ slot, pares, recebimentos, aoAbrir, aoAbrirNF }: {
+const LARG_COL = 84;  // largura fixa das colunas de recebimento (permite desenhar só as visíveis)
+const FOLGA = 6, PASSO = 8;
+export function PlanilhaEntrada({ slot, pares, recebimentos, aoAbrir, aoAbrirNF }: {
   slot: HTMLElement | null;
   pares: { linha: string; canteiro: string }[]; recebimentos: Recebimento[]; aoAbrir: (r: Recebimento) => void; aoAbrirNF: (nfId: number) => void;
 }) {
   const saldos = useSaldos();
   const lanc = useLancamentos();
-  const cruz = useTabelaCruz();  // cruz do mouse + seleção (clique, arrastar, Ctrl), como no Estoque
   const [soRecebidos, setSoRecebidos] = useState(false);
+  // colunas desenhadas: [ini, fim) dos recebimentos; o resto vira espaçador com a largura exata (rolagem igual à da tabela inteira)
+  const caixa = useRef<HTMLDivElement>(null);
+  const [faixa, setFaixa] = useState<[number, number]>([0, 40]);
+  const congelado = useRef(0);  // largura das 3 colunas congeladas
+  const vRef = useRef<{ n: number; valor: (k: string, c: number) => string }>({ n: 0, valor: () => '' });
+  const cruz = useTabelaCruz({
+    virtual: {
+      get colunas() { return 3 + vRef.current.n; },
+      valor: (k, c) => vRef.current.valor(k, c),
+      mostrarColuna: (c) => {
+        const b = caixa.current;
+        if (!b || c < 3) return;
+        const x = (c - 3) * LARG_COL, vis = b.clientWidth - congelado.current;
+        if (x < b.scrollLeft) b.scrollLeft = x;
+        else if (x + LARG_COL > b.scrollLeft + vis) b.scrollLeft = x + LARG_COL - vis;
+        recalcular();
+      },
+    },
+  });
+  const recalcular = () => {
+    const b = caixa.current;
+    if (!b) return;
+    const n = vRef.current.n;
+    const ini = Math.max(0, Math.floor(b.scrollLeft / LARG_COL) - FOLGA);
+    const fim = Math.min(n, Math.ceil((b.scrollLeft + b.clientWidth - congelado.current) / LARG_COL) + FOLGA);
+    const a = Math.floor(ini / PASSO) * PASSO, z = Math.min(n, Math.ceil(fim / PASSO) * PASSO);
+    setFaixa((f) => (f[0] === a && f[1] === z ? f : [a, z]));
+  };
+  useEffect(() => {
+    const f = () => recalcular();
+    window.addEventListener('resize', f);
+    return () => window.removeEventListener('resize', f);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
   const tabRef = cruz.ref;
   // congela como no Excel: as linhas do cabeçalho presas no topo e as 3 primeiras colunas presas à esquerda
   useLayoutEffect(() => {
@@ -223,20 +258,21 @@ function PlanilhaEntrada({ slot, pares, recebimentos, aoAbrir, aoAbrirNF }: {
     const tit = t.tHead.rows[t.tHead.rows.length - 1];
     const w = [0, 1, 2].map((i) => tit.cells[i]?.offsetWidth ?? 0);
     const esq = [0, w[0], w[0] + w[1]];
-    const ocupado: number[][] = [];  // colunas tomadas por rowSpan de linhas anteriores
-    [...t.rows].forEach((tr, r) => {
+    const antes = congelado.current;
+    congelado.current = w[0] + w[1] + w[2];
+    for (const tr of t.rows) {
       let col = 0;
       for (const c of tr.cells) {
-        while (ocupado[r]?.includes(col)) col++;
         const ini = col;
-        for (let k = 1; k < c.rowSpan; k++) for (let x = 0; x < c.colSpan; x++) (ocupado[r + k] ??= []).push(ini + x);
         col += c.colSpan;
-        if (ini >= 3 || col > 3) continue;
+        if (ini >= 3) break;
+        if (col > 3) continue;
         c.style.position = 'sticky'; c.style.left = `${esq[ini]}px`;
         c.style.zIndex = tr.parentElement === t.tHead ? '4' : '1';
         if (col === 3) c.classList.add('ult-cong');
       }
-    });
+    }
+    if (antes !== congelado.current) recalcular();
   });
   const variasLinhas = new Set(pares.map((p) => p.linha)).size > 1;
   const pos = (l: string, c: string) => pares.findIndex((p) => p.linha === l && p.canteiro === c);
@@ -283,6 +319,24 @@ function PlanilhaEntrada({ slot, pares, recebimentos, aoAbrir, aoAbrirNF }: {
     ['Remessa', (c) => c.romaneio ?? ''],
   ];
   const linhasItens = soRecebidos ? itens.filter((i) => i.recebido !== 0) : itens;
+  // valor de qualquer célula (à vista ou não) para a soma da seleção e o Ctrl+seta
+  const porId = new Map(itens.map((i) => [String(i.material_id), i]));
+  vRef.current = {
+    n: mostrar.length,
+    valor: (k, c) => {
+      const it = porId.get(k);
+      if (c === 0) return it?.descricao ?? '';
+      if (c === 1) return it ? num(it.previsto) : '';
+      if (c === 2) return it ? num(it.recebido) : '';
+      const col = mostrar[c - 3];
+      const v = col ? qtd.get(`${k}|${col.id}`) : undefined;
+      return v ? num(v) : '';
+    },
+  };
+  const [ini, fim] = [Math.min(faixa[0], mostrar.length), Math.min(faixa[1], mostrar.length)];
+  const vis = mostrar.slice(ini, fim);
+  const espEsq = ini * LARG_COL, espDir = (mostrar.length - fim) * LARG_COL;
+  const esp = (w: number, th = false) => (w > 0 ? (th ? <th className="vesp" style={{ width: w, minWidth: w }} /> : <td className="vesp" style={{ width: w, minWidth: w }} />) : null);
   let secao = '';
   let parteAnt: string | null = null;
   return (
@@ -292,18 +346,22 @@ function PlanilhaEntrada({ slot, pares, recebimentos, aoAbrir, aoAbrirNF }: {
           <ResumoSelecao refSpan={cruz.resumoRef} />
           <label className="chk"><input type="checkbox" checked={soRecebidos} onChange={(e) => setSoRecebidos(e.target.checked)} /> Só itens recebidos</label>
         </>, slot)}
-      <div className="panel planilha conteudo">
-        <table ref={tabRef} className="cruz" onMouseDown={cruz.onMouseDown} onMouseOver={cruz.onMouseOver} onMouseLeave={cruz.onMouseLeave}>
+      <div className="panel planilha conteudo" ref={caixa} onScroll={recalcular}>
+        <table ref={tabRef} className="cruz virtual" onMouseDown={cruz.onMouseDown} onMouseOver={cruz.onMouseOver} onMouseLeave={cruz.onMouseLeave}>
           <thead>
             {cab.map(([rot, f], i) => (
               <tr key={rot} className={`cab ${rot === 'Nota fiscal' ? 'cab-nf' : ''}`}>
                 <th className="rot" colSpan={3}>{rot}</th>
-                {mostrar.map((c) => <td key={c.id} className={`cabv ${i === cab.length - 1 ? 'ult' : ''}`}>{f(c)}</td>)}
+                {esp(espEsq)}
+                {vis.map((c) => <td key={c.id} className={`cabv ${i === cab.length - 1 ? 'ult' : ''}`}>{f(c)}</td>)}
+                {esp(espDir)}
               </tr>
             ))}
             <tr className="tit">
               <th>Descrição</th><th className="r">Previsto</th><th className="r">Recebido</th>
-              {mostrar.map((c) => <th key={c.id} className="colv">{variasLinhas ? `${c.linha} · ${c.canteiro}` : c.canteiro}</th>)}
+              {esp(espEsq, true)}
+              {vis.map((c) => { const t = variasLinhas ? `${c.linha} · ${c.canteiro}` : c.canteiro; return <th key={c.id} className="colv" title={t}>{t}</th>; })}
+              {esp(espDir, true)}
             </tr>
           </thead>
           <tbody>
@@ -312,20 +370,22 @@ function PlanilhaEntrada({ slot, pares, recebimentos, aoAbrir, aoAbrirNF }: {
               if (s.secao !== secao) {
                 secao = s.secao;
                 parteAnt = null;
-                out.push(<tr key={`s${s.material_id}`} className="sec faixa"><td>{s.secao}</td><td /><td />{mostrar.length > 0 && <td colSpan={mostrar.length} />}</tr>);
+                out.push(<tr key={`s${s.material_id}`} className="sec faixa"><td>{s.secao}</td><td /><td />{mostrar.length > 0 && <td colSpan={vis.length + (espEsq > 0 ? 1 : 0) + (espDir > 0 ? 1 : 0)} />}</tr>);
               }
               const falta = s.recebido < s.previsto;
               const iniParte = parteAnt !== null && s.parte !== parteAnt;  // linha mais escura entre componentes
               parteAnt = s.parte;
               out.push(
                 <tr key={s.material_id} data-k={s.material_id} className={iniParte ? 'ini-parte' : ''}>
-                  <td className="desc">{s.descricao}</td>
-                  <td className="r num prev">{num(s.previsto)}</td>
-                  <td className={`r num rec ${falta ? 'warn' : ''}`}>{num(s.recebido)}</td>
-                  {mostrar.map((c) => {
+                  <td className="desc" data-c={0}>{s.descricao}</td>
+                  <td className="r num prev" data-c={1}>{num(s.previsto)}</td>
+                  <td className={`r num rec ${falta ? 'warn' : ''}`} data-c={2}>{num(s.recebido)}</td>
+                  {esp(espEsq)}
+                  {vis.map((c, j) => {
                     const v = qtd.get(`${s.material_id}|${c.id}`);
-                    return <td key={c.id} className={`r num ${v !== undefined && v < 0 ? 'warn' : ''}`}>{v ? num(v) : ''}</td>;
+                    return <td key={c.id} data-c={3 + ini + j} className={`r num ${v !== undefined && v < 0 ? 'warn' : ''}`}>{v ? num(v) : ''}</td>;
                   })}
+                  {esp(espDir)}
                 </tr>,
               );
               return out;

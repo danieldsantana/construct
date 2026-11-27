@@ -529,3 +529,10 @@ body:has(.lancar.conteudo) .notas-tela .titulo .sub { display: none; }
 .fc-pop .fc-ordem button { text-align: left; border: 0; background: transparent; padding: 3px 6px; font: inherit; font-size: 13px; cursor: pointer; color: var(--ink); }
 .fc-pop .fc-ordem button:hover { background: var(--line-soft); }
 .fc-pop .fc-ordem button.on { background: var(--navy-tint); color: var(--navy); font-weight: 700; }
+
+/* Planilha de entrada virtual: colunas de recebimento com largura fixa; espaçadores sem borda; coluna sob o mouse por classe */
+.planilha table.virtual { table-layout: auto; }
+.planilha table.virtual td[data-c]:not([data-c="0"]):not([data-c="1"]):not([data-c="2"]),
+.planilha table.virtual thead td.cabv, .planilha table.virtual thead th.colv { width: 84px; min-width: 84px; max-width: 84px; overflow: hidden; text-overflow: ellipsis; }
+.planilha table.virtual .vesp { padding: 0 !important; border: 0 !important; background: transparent !important; box-shadow: none !important; }
+table.cruz.virtual tbody tr:not(.faixa) > td.hl-col { background-image: linear-gradient(rgba(0, 46, 109, .035), rgba(0, 46, 109, .035)); }
