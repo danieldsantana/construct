@@ -536,3 +536,7 @@ body:has(.lancar.conteudo) .notas-tela .titulo .sub { display: none; }
 .planilha table.virtual thead td.cabv, .planilha table.virtual thead th.colv { width: 84px; min-width: 84px; max-width: 84px; overflow: hidden; text-overflow: ellipsis; }
 .planilha table.virtual .vesp { padding: 0 !important; border: 0 !important; background: transparent !important; box-shadow: none !important; }
 table.cruz.virtual tbody tr:not(.faixa) > td.hl-col { background-image: linear-gradient(rgba(0, 46, 109, .035), rgba(0, 46, 109, .035)); }
+
+/* cabeçalho fixo como um bloco só (todas as linhas juntas): não sobram frestas entre as linhas por onde o corpo aparecia */
+thead { position: sticky; top: 0; z-index: 3; }
+thead th, thead td { top: auto; }

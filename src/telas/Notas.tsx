@@ -250,11 +250,6 @@ export function PlanilhaEntrada({ slot, pares, recebimentos, aoAbrir, aoAbrirNF 
   useLayoutEffect(() => {
     const t = tabRef.current;
     if (!t?.tHead) return;
-    let top = 0;
-    for (const tr of t.tHead.rows) {
-      for (const c of tr.cells) { c.style.position = 'sticky'; c.style.top = `${top}px`; c.style.zIndex = '2'; }
-      top += tr.offsetHeight;
-    }
     const tit = t.tHead.rows[t.tHead.rows.length - 1];
     const w = [0, 1, 2].map((i) => tit.cells[i]?.offsetWidth ?? 0);
     const esq = [0, w[0], w[0] + w[1]];

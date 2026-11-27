@@ -10,7 +10,7 @@
 /* início de tramo (ancoragem): marca quase invisível */
 .torres-tabela tr.ancoragem td { border-top: 1px solid rgba(254,107,0,.22); }
 .torres-tabela th { top: 0; }
-.torres-tabela thead tr:nth-child(2) th { top: 27px; }
+
 .torres-tabela th.grp { text-align: center; background: var(--navy-2); border-left: 2px solid #fff; }
 .torres-tabela th.sub { font-size: 11px; text-transform: none; }
 .torres-tabela td.tnum { background-color: var(--navy); color: #fff; font-weight: 700; text-align: center; min-width: 54px; }

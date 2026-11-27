@@ -46,7 +46,7 @@ table.est tr.parte:hover > td.pint-falta { background-color: #efaea7; }
 }
 
 /* VOLUMES RECEBIDOS (layout do controle, visual leve) */
-table.est.vr thead tr.sub th { top: 27px; font-size: 11px; }
+table.est.vr thead tr.sub th { font-size: 11px; }
 table.est.vr td { padding: 3px 8px; font-size: 12.5px; }
 table.est.vr tr.faixa td { background-color: #e8eef7; border-color: #d5dfec; padding: 5px 10px; }
 .faixa-c { display: flex; align-items: baseline; gap: 16px; color: var(--navy); font-size: 12.5px; }
