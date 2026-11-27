@@ -1,8 +1,9 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useEditor } from '../lib/sessao';
-import { num } from '../lib/formato';
+import { data, num } from '../lib/formato';
 import {
-  confirmarNF, desfazerRecebimento, marcarRecebida, salvarNF, sugerirItens, useCanteiros, useNFItens, useNotasFiscais, usePendencias, useSaldos,
+  confirmarNF, desfazerRecebimento, marcarRecebida, salvarNF, sugerirItens, useCanteiros, useLancamentos, useNFItens, useNotasFiscais, usePendencias,
+  useRecebimentos, useSaldos,
   type NotaFiscal, type PendenciaNova,
 } from '../dados/recebimento';
 import { lerNFsDeArquivos, problemasRomaneio, type LeituraNF } from '../lib/lerNF';
@@ -141,6 +142,9 @@ const paraBR = (v: number | null, casas: number) => (v === null ? '' : v.toLocal
 const normaliza = (t: string | null | undefined) => (t ?? '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[–—]/g, '-').replace(/\s+/g, ' ').trim().toUpperCase();
 type Lida = { arquivo: string; l: LeituraNF; arquivos: string[] };
 type SemPar = { seq: number; descricao: string; quantidade: number; como: string };
+// diferença entre a NF já cadastrada e o que está sendo lançado (o usuário escolhe o que fica)
+type Dif = { k: string; rotulo: string; cad: string; novo: string; item?: { material_id: number; cad: number; novo: number } };
+const numOF = (t: string | null | undefined) => (t ?? '').match(/BRM-(\d+)|^\s*OF\s*-\s*(\d+)/)?.slice(1).find(Boolean) ?? (t ?? '').trim();
 
 // ---------- Lançar NF manualmente: uma "coluna da ENTRADA" (cabeçalho + quantidade por item, na ordem do controle) ----------
 export function LancarNFTela() {
@@ -179,6 +183,10 @@ export function LancarNF({ slot }: { slot: HTMLElement | null }) {
   const [pdfAberto, setPdfAberto] = useState<string | null>(null);
   useEffect(() => () => { for (const u of urls.current.values()) URL.revokeObjectURL(u); }, []);
   const [arrastando, setArrastando] = useState(false);
+  const nfItens = useNFItens();
+  const recs = useRecebimentos();
+  const lancs = useLancamentos();
+  const [escolha, setEscolha] = useState<Record<string, 'cad' | 'novo'>>({});
   useEffect(() => {
     if (!aviso) return;
     const t = setTimeout(() => setAviso(null), 3600);
@@ -205,6 +213,51 @@ export function LancarNF({ slot }: { slot: HTMLElement | null }) {
   const visiveis = useMemo(() => doTipo.filter((i) => !filtroDesc || filtroDesc.has(i.descricao)), [doTipo, filtroDesc]);
   const peso = itens.reduce((s, i) => s + n(qtd[i.material_id]) * n(i.peso_unit), 0);
   const preenchidos = itens.filter((i) => n(qtd[i.material_id]) !== 0);
+
+  // ---------- NF já cadastrada: diferenças campo a campo e item a item ----------
+  const numero = cab.numero.replace(/^0+/, '');
+  const existente = useMemo(() => nfsCad.dados.find((x) => x.numero === numero) ?? null, [nfsCad.dados, numero]);
+  const nomeMat = useMemo(() => new Map(saldos.dados.map((s) => [s.material_id, s.descricao])), [saldos.dados]);
+  const itensCad = useMemo(() => {
+    const m = new Map<number, number>();
+    if (!existente) return m;
+    for (const i of nfItens.dados) if (i.nota_fiscal_id === existente.id) m.set(i.material_id, (m.get(i.material_id) ?? 0) + n(i.quantidade));
+    if (!m.size) {  // recebida pelo controle: o que foi lançado na ENTRADA
+      const movs = new Set(recs.dados.filter((r) => r.nf_id === existente.id).map((r) => r.id));
+      for (const l of lancs.dados) if (movs.has(l.movimento_id)) m.set(l.material_id, (m.get(l.material_id) ?? 0) + n(l.quantidade));
+    }
+    return m;
+  }, [existente, nfItens.dados, recs.dados, lancs.dados]);
+  const recebida = !!existente && (!!existente.recebida_em || recs.dados.some((r) => r.nf_id === existente.id));
+  const comItens = !!existente && (itensCad.size > 0 || !!existente.lancamento);
+  const difs = useMemo<Dif[]>(() => {
+    if (!existente) return [];
+    const out: Dif[] = [];
+    const campo = (k: string, rotulo: string, cad: string | null, novo: string, igual: boolean) => {
+      if (cad && novo && !igual) out.push({ k, rotulo, cad, novo });
+    };
+    const vNovo = cab.valor ? Number(deBR(cab.valor)) : null;
+    const pNovo = cab.peso ? Number(deBR(cab.peso)) : null;
+    campo('emissao', 'Data de emissão', existente.emissao, cab.emissao, existente.emissao === cab.emissao);
+    campo('linha', 'Linha', existente.linha, linha, existente.linha === linha);
+    campo('destino', 'Canteiro de destino', existente.destino, destino, existente.destino === destino);
+    campo('of', 'OF', existente.of_texto, cab.of, numOF(existente.of_texto) === numOF(cab.of));
+    campo('valor', 'Valor NF', existente.valor !== null ? `R$ ${paraBR(n(existente.valor), 2)}` : null, vNovo !== null ? `R$ ${cab.valor}` : '',
+      vNovo !== null && Math.abs(n(existente.valor) - vNovo) < 0.01);
+    campo('peso', 'Peso NF (kg)', existente.peso !== null ? paraBR(n(existente.peso), 3) : null, pNovo !== null ? cab.peso : '',
+      pNovo !== null && Math.abs(n(existente.peso) - pNovo) < 0.001);
+    campo('romaneio', 'Remessa', existente.romaneio, cab.romaneio, (existente.romaneio ?? '').replace(/^0+/, '') === cab.romaneio.replace(/^0+/, ''));
+    if (preenchidos.length) {
+      const novos = new Map(preenchidos.map((i) => [i.material_id, n(qtd[i.material_id])]));
+      for (const id of new Set([...itensCad.keys(), ...novos.keys()])) {
+        const c = itensCad.get(id) ?? 0, v = novos.get(id) ?? 0;
+        if (Math.abs(c - v) > 1e-9) out.push({ k: `m${id}`, rotulo: nomeMat.get(id) ?? `material ${id}`, cad: num(c), novo: num(v), item: { material_id: id, cad: c, novo: v } });
+      }
+    }
+    return out;
+  }, [existente, cab, linha, destino, preenchidos, qtd, itensCad, nomeMat]);
+  const lado = (d: Dif) => escolha[d.k] ?? 'cad';
+  useEffect(() => { setEscolha({}); }, [numero]);
 
   if (!editor) return <p className="muted">Lançamento só para quem tem perfil de edição.</p>;
 
@@ -268,12 +321,28 @@ export function LancarNF({ slot }: { slot: HTMLElement | null }) {
     try {
       const l = atual?.l;
       const probs = l ? problemasRomaneio(l) : [];
+      const fica = (k: string) => difs.some((d) => d.k === k && lado(d) === 'cad');
+      const ex = existente;
+      let itensEnv = preenchidos.map((i) => ({ material_id: i.material_id, quantidade: n(qtd[i.material_id]) }));
+      if (ex && comItens) {
+        const m = new Map(itensCad);
+        for (const d of difs) if (d.item && lado(d) === 'novo') m.set(d.item.material_id, d.item.novo);
+        itensEnv = [...m].filter(([, q]) => q !== 0).map(([material_id, quantidade]) => ({ material_id, quantidade }));
+      }
       await salvarNF({
         ...cab, valor: deBR(cab.valor), peso: deBR(cab.peso), linha, destino, lancamento: l ? 'pdf' : 'manual',
-        itens: preenchidos.map((i) => ({ material_id: i.material_id, quantidade: n(qtd[i.material_id]) })),
+        ...(ex && fica('emissao') ? { emissao: ex.emissao ?? '' } : {}),
+        ...(ex && fica('of') ? { of: ex.of_texto ?? '' } : {}),
+        ...(ex && fica('romaneio') ? { romaneio: ex.romaneio ?? '' } : {}),
+        ...(ex && fica('valor') ? { valor: String(ex.valor) } : {}),
+        ...(ex && fica('peso') ? { peso: String(ex.peso) } : {}),
+        ...(ex && fica('linha') ? { linha: ex.linha ?? '' } : {}),
+        ...(ex && fica('destino') ? { destino: ex.destino ?? '' } : {}),
+        substituir: !!ex && comItens,
+        itens: itensEnv,
         ...(l ? { arquivo: atual!.arquivo, peso_danfe: l.peso_liquido, romaneio_itens: l.romaneio, romaneio_confere: !probs.length, romaneio_obs: probs.join('; ') } : {}),
       });
-      setAviso({ id: Date.now(), texto: `NF ${cab.numero} cadastrada` });
+      setAviso({ id: Date.now(), texto: `NF ${cab.numero} ${existente && comItens ? 'atualizada' : 'cadastrada'}` });
       setCab({ numero: '', emissao: '', of: '', romaneio: '', valor: '', peso: '' }); setQtd({}); setSemPar([]);
       const prox = lidas.find((x) => x !== atual && x.l.nf !== cab.numero && !jaCadastrada(x.l.nf));
       setLidas((ls) => ls.filter((x) => x !== atual));
@@ -323,11 +392,31 @@ export function LancarNF({ slot }: { slot: HTMLElement | null }) {
           <span className="num">Peso pelos itens: <b>{num(peso, 1)} kg</b>{cab.peso && <> · NF: <b>{num(Number(deBR(cab.peso)), 1)} kg</b>
             {Math.abs(peso - Number(deBR(cab.peso))) > 1 && <span className="warn"> (diferença {num(peso - Number(deBR(cab.peso)), 1)} kg)</span>}</>}</span>
           <span className="grow" />
-          <button className="pri" disabled={ocupado || !cab.numero || !destino || (!cab.of && !semOFnoDanfe) || !preenchidos.length} onClick={salvar}>Lançar como emitida</button>
+          <button className="pri" disabled={ocupado || !cab.numero || !destino || (!cab.of && !semOFnoDanfe) || !preenchidos.length || recebida
+                                           || (comItens && !difs.some((d) => lado(d) === 'novo'))} onClick={salvar}>
+            {comItens ? 'Atualizar NF' : 'Lançar como emitida'}</button>
         </div>
         {msg && <div className="callout" style={{ marginTop: 8 }}>{msg}</div>}
-        {atual && jaCadastrada(atual.l.nf) && <div className="callout" style={{ marginTop: 8 }}>NF {atual.l.nf} já cadastrada</div>}
+        {existente && (recebida || comItens) && !difs.length && (
+          <div className="callout" style={{ marginTop: 8 }}>NF {existente.numero} já cadastrada{recebida ? `, recebida em ${data(existente.recebida_em)}` : ''}, sem diferenças</div>
+        )}
       </div>
+      {existente && difs.length > 0 && (
+        <div className="panel comparacao">
+          <table>
+            <thead><tr><th>NF {existente.numero} já cadastrada{recebida ? ` · recebida em ${data(existente.recebida_em)}` : ''}</th><th>Cadastrado</th><th>Novo</th></tr></thead>
+            <tbody>{difs.map((d) => (
+              <tr key={d.k}>
+                <td>{d.rotulo}</td>
+                {(['cad', 'novo'] as const).map((o) => (
+                  <td key={o} className={`opc ${lado(d) === o ? 'on' : ''} ${recebida ? 'trava' : ''}`}
+                      onClick={() => !recebida && setEscolha((e) => ({ ...e, [d.k]: o }))}>{o === 'cad' ? d.cad : d.novo}</td>
+                ))}
+              </tr>
+            ))}</tbody>
+          </table>
+        </div>
+      )}
       {semPar.length > 0 && (
         <div className="panel sem-par">
           <table>

@@ -100,7 +100,7 @@ export const usePendencias = () =>
 
 export type NFLancamento = { numero: string; emissao?: string; of?: string; romaneio?: string; valor?: string; peso?: string; linha: string; destino: string;
   lancamento: 'pdf' | 'manual'; itens: { material_id: number; quantidade: number }[];
-  arquivo?: string; peso_danfe?: number | null; romaneio_itens?: unknown[]; romaneio_confere?: boolean; romaneio_obs?: string };
+  arquivo?: string; peso_danfe?: number | null; romaneio_itens?: unknown[]; romaneio_confere?: boolean; romaneio_obs?: string; substituir?: boolean };
 async function chamar<T>(fn: string, args: Record<string, unknown>): Promise<T> {
   const { data, error } = await supabase.rpc(fn, args);
   if (error) throw new Error(error.message);

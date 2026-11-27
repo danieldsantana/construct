@@ -460,3 +460,12 @@ body:has(.lancar.conteudo) .notas-tela .titulo .sub { display: none; }
 .lancar-pdf .pdf-abas button { border: 0; background: transparent; color: #fff; opacity: .8; padding: 4px 10px; font-size: 12.5px; cursor: pointer; }
 .lancar-pdf .pdf-abas button.on { background: #fff; color: var(--navy); opacity: 1; font-weight: 700; }
 .lancar-pdf iframe { flex: 1 1 auto; width: 100%; border: 0; min-height: 0; }
+
+/* Lançar NF: NF já cadastrada — diferenças, com escolha do que fica (clique na célula) */
+.panel.comparacao { margin-bottom: 10px; flex: 0 0 auto; max-height: 240px; overflow: auto; }
+.panel.comparacao thead th { position: sticky; top: 0; background: var(--orange); color: #fff; text-align: left; font-size: 12.5px; }
+.panel.comparacao td { padding: 2px 8px; font-size: 13px; }
+.panel.comparacao td.opc { cursor: pointer; text-align: center; min-width: 120px; color: var(--muted); }
+.panel.comparacao td.opc:hover { background: var(--line-soft); }
+.panel.comparacao td.opc.on { background: #dff3e6; color: var(--ink); font-weight: 700; box-shadow: inset 0 0 0 1.5px var(--ok); }
+.panel.comparacao td.opc.trava { cursor: default; }
