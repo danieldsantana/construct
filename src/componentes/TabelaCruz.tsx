@@ -1,10 +1,12 @@
 import { useCallback, useEffect, useLayoutEffect, useRef, type MouseEvent } from 'react';
 
-// Tabelas com destaque em cruz (mouse) e seleção de células como no Excel — usado no Estoque e na Lista.
+// Tabelas com destaque em cruz (mouse) e seleção de células como no Excel — usado no Estoque, na Lista e na Planilha de entrada.
 // Uso: <table className="cruz" ref={s.ref} onMouseDown={s.onMouseDown} onMouseOver={s.onMouseOver} onMouseLeave={s.onMouseLeave}>,
 // linhas do tbody com data-k (identificador da linha) e <ResumoSelecao refSpan={s.resumoRef} /> onde mostrar a soma.
-// Tudo é aplicado direto no DOM (sem estado do React): mover o mouse ou arrastar não redesenha a tabela.
+// Tudo é aplicado direto no DOM (sem estado do React): mover o mouse, arrastar ou usar as setas não redesenha a tabela.
+// Teclado: setas movem; Shift+setas estendem a partir da âncora; Ctrl+setas vão até a borda; Esc limpa. Shift+clique estende.
 type Pos = { r: number; c: number };
+const BORDA = 'rgba(0, 46, 109, .38)';
 
 // A cruz do mouse vale sempre. Opções da SELEÇÃO: cruz = sombra fixa na linha/coluna das células selecionadas;
 // referencia = seletor das células da linha que acompanham a seleção (ex. Lista: 'td.tnum, td.tipo', sem cruz fixa).
@@ -13,6 +15,8 @@ export function useTabelaCruz({ cruz = true, referencia = '' }: { cruz?: boolean
   const resumoRef = useRef<HTMLSpanElement>(null);
   const sel = useRef<Set<string>>(new Set());
   const arraste = useRef<{ ini: Pos; base: Set<string>; ultimo: string } | null>(null);
+  const ancora = useRef<Pos | null>(null);   // onde a seleção começou (Shift estende a partir daqui)
+  const ativo = useRef<Pos | null>(null);    // célula "atual" (as setas movem esta)
 
   const linhas = () => [...(ref.current?.querySelectorAll<HTMLTableRowElement>(':scope > tbody > tr[data-k]') ?? [])];
   const chave = (td: HTMLTableCellElement) => `${(td.parentElement as HTMLElement).dataset.k}|${td.cellIndex}`;
@@ -21,28 +25,41 @@ export function useTabelaCruz({ cruz = true, referencia = '' }: { cruz?: boolean
     const tr = td?.parentElement as HTMLTableRowElement | undefined;
     return td && tr?.dataset.k && td.closest('table') === ref.current ? td : null;
   };
+  const tdEm = (ls: HTMLTableRowElement[], p: Pos) => {
+    const tr = ls[p.r];
+    return tr ? tr.cells[Math.min(p.c, tr.cells.length - 1)] ?? null : null;
+  };
 
-  // marca as células selecionadas (+ sombra leve na linha e na coluna) e escreve contagem/soma
+  // marca as células selecionadas (+ sombra leve na linha e na coluna), borda só no contorno, e escreve contagem/soma
   const aplicar = useCallback(() => {
     const t = ref.current;
     if (!t) return;
+    t.querySelectorAll<HTMLTableCellElement>('td.selc').forEach((td) => { td.style.boxShadow = ''; });
     t.querySelectorAll('td.selc, td.sel-lin, td.sel-col, td.sel-ref').forEach((td) => td.classList.remove('selc', 'sel-lin', 'sel-col', 'sel-ref'));
     const s = sel.current;
     let numeros = 0, soma = 0;
     if (s.size) {
       const cols = new Set<number>();
       const ls = linhas();
-      for (const tr of ls) {
-        let marcada = false;
+      const marcada = (r: number, c: number) => { const tr = ls[r]; const td = tr?.cells[c]; return !!td && td.cellIndex === c && s.has(chave(td)); };
+      ls.forEach((tr, r) => {
+        let tem = false;
         for (const td of tr.cells) {
           if (!s.has(chave(td))) continue;
-          marcada = true; cols.add(td.cellIndex); td.classList.add('selc');
+          tem = true; cols.add(td.cellIndex); td.classList.add('selc');
+          const c = td.cellIndex;
+          // borda só onde a vizinha não está selecionada (seleção contínua sem bordas internas)
+          const lados = [
+            !marcada(r - 1, c) && `inset 0 1px 0 ${BORDA}`, !marcada(r + 1, c) && `inset 0 -1px 0 ${BORDA}`,
+            !marcada(r, c - 1) && `inset 1px 0 0 ${BORDA}`, !marcada(r, c + 1) && `inset -1px 0 0 ${BORDA}`,
+          ].filter(Boolean);
+          td.style.boxShadow = lados.join(', ');
           const txt = (td.textContent ?? '').trim();
           if (/^-?[\d.]+(,\d+)?$/.test(txt)) { numeros += 1; soma += Number(txt.replace(/\./g, '').replace(',', '.')); }
         }
-        if (marcada && cruz) for (const td of tr.cells) td.classList.add('sel-lin');
-        if (marcada && referencia) tr.querySelectorAll(referencia).forEach((td) => td.classList.add('sel-ref'));
-      }
+        if (tem && cruz) for (const td of tr.cells) td.classList.add('sel-lin');
+        if (tem && referencia) tr.querySelectorAll(referencia).forEach((td) => td.classList.add('sel-ref'));
+      });
       if (cruz) for (const tr of ls) for (const td of tr.cells) if (cols.has(td.cellIndex)) td.classList.add('sel-col');
     }
     const r = resumoRef.current;
@@ -67,11 +84,20 @@ export function useTabelaCruz({ cruz = true, referencia = '' }: { cruz?: boolean
     if (!td) return;
     e.preventDefault();  // não seleciona texto ao arrastar
     const k = chave(td);
+    const p = { r: linhas().indexOf(td.parentElement as HTMLTableRowElement), c: td.cellIndex };
     const ctrl = e.ctrlKey || e.metaKey;
+    if (e.shiftKey && ancora.current) {  // Shift+clique: estende da âncora até aqui
+      ativo.current = p;
+      sel.current = retangulo(ancora.current, p);
+      arraste.current = { ini: ancora.current, base: new Set(), ultimo: k };
+      aplicar();
+      return;
+    }
     if (ctrl && sel.current.has(k)) { sel.current.delete(k); arraste.current = null; aplicar(); return; }
-    if (!ctrl && sel.current.size === 1 && sel.current.has(k)) { sel.current = new Set(); arraste.current = null; aplicar(); return; }
+    if (!ctrl && sel.current.size === 1 && sel.current.has(k)) { sel.current = new Set(); arraste.current = null; ancora.current = ativo.current = null; aplicar(); return; }
     const base = ctrl ? new Set(sel.current) : new Set<string>();
-    arraste.current = { ini: { r: linhas().indexOf(td.parentElement as HTMLTableRowElement), c: td.cellIndex }, base, ultimo: k };
+    arraste.current = { ini: p, base, ultimo: k };
+    ancora.current = p; ativo.current = p;
     sel.current = new Set([...base, k]);
     aplicar();
   };
@@ -88,7 +114,9 @@ export function useTabelaCruz({ cruz = true, referencia = '' }: { cruz?: boolean
     const k = chave(td);
     if (k === a.ultimo) return;
     a.ultimo = k;
-    sel.current = new Set([...a.base, ...retangulo(a.ini, { r: linhas().indexOf(tr), c: td.cellIndex })]);
+    const p = { r: linhas().indexOf(tr), c: td.cellIndex };
+    ativo.current = p;
+    sel.current = new Set([...a.base, ...retangulo(a.ini, p)]);
     aplicar();
   };
 
@@ -96,10 +124,39 @@ export function useTabelaCruz({ cruz = true, referencia = '' }: { cruz?: boolean
 
   useEffect(() => {
     const fim = () => { arraste.current = null; };
-    const esc = (e: KeyboardEvent) => { if (e.key === 'Escape' && sel.current.size) { sel.current = new Set(); aplicar(); } };
+    const tecla = (e: KeyboardEvent) => {
+      if (!sel.current.size || !ref.current || !ativo.current) return;
+      const alvo = e.target as HTMLElement;
+      if (typeof alvo?.closest === 'function' && alvo.closest('input, select, textarea, [contenteditable="true"]')) return;
+      if (e.key === 'Escape') { sel.current = new Set(); ancora.current = ativo.current = null; aplicar(); return; }
+      const dir = ({ ArrowUp: [-1, 0], ArrowDown: [1, 0], ArrowLeft: [0, -1], ArrowRight: [0, 1] } as Record<string, [number, number]>)[e.key];
+      if (!dir) return;
+      e.preventDefault();
+      const ls = linhas();
+      if (!ls.length) return;
+      const a = ativo.current;
+      const ctrl = e.ctrlKey || e.metaKey;
+      let r = a.r, c = a.c;
+      if (dir[0]) r = ctrl ? (dir[0] < 0 ? 0 : ls.length - 1) : Math.max(0, Math.min(ls.length - 1, r + dir[0]));
+      if (dir[1]) {
+        const ult = (ls[r]?.cells.length ?? 1) - 1;
+        c = ctrl ? (dir[1] < 0 ? 0 : ult) : Math.max(0, Math.min(ult, c + dir[1]));
+      }
+      const novo = { r, c };
+      ativo.current = novo;
+      if (e.shiftKey && ancora.current) {
+        sel.current = retangulo(ancora.current, novo);
+      } else {
+        ancora.current = novo;
+        const td = tdEm(ls, novo);
+        sel.current = td ? new Set([chave(td)]) : new Set();
+      }
+      aplicar();
+      tdEm(ls, novo)?.scrollIntoView?.({ block: 'nearest', inline: 'nearest' });
+    };
     window.addEventListener('mouseup', fim);
-    window.addEventListener('keydown', esc);
-    return () => { window.removeEventListener('mouseup', fim); window.removeEventListener('keydown', esc); };
+    window.addEventListener('keydown', tecla);
+    return () => { window.removeEventListener('mouseup', fim); window.removeEventListener('keydown', tecla); };
   }, [aplicar]);
 
   // depois de cada render (filtro, ordem…), reaplica a marcação nas células que ainda existem

@@ -327,6 +327,6 @@ button.pri:disabled { opacity: .5; }
 .planilha tr.ini-parte > td { box-shadow: inset 0 1px 0 #c3cad4; }
 .planilha tr.ini-parte > td.ult-cong { box-shadow: inset 0 1px 0 #c3cad4, inset -2px 0 0 var(--line); }
 /* célula selecionada: borda levemente mais escura (Estoque, Lista, Planilha de entrada) */
-table.cruz tbody td.selc, table.selecionavel tbody td.selc { box-shadow: inset 0 0 0 1px rgba(0, 46, 109, .38) !important; }
+/* (borda da seleção: aplicada só no contorno, pelo componente TabelaCruz) */
 /* planilha de entrada: números centralizados (descrição continua à esquerda) */
 .planilha td.r, .planilha th.r, .planilha tbody td:not(.desc):not([colspan]) { text-align: center; }
