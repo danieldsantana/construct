@@ -199,7 +199,9 @@ function PlanilhaEntrada({ pares, recebimentos, aoAbrir, aoAbrirNF }: {
   const pos = (l: string, c: string) => pares.findIndex((p) => p.linha === l && p.canteiro === c);
 
   const colunas = useMemo(() => recebimentos.filter((r) => pos(r.linha, r.canteiro) >= 0)
-    .sort((a, b) => pos(a.linha, a.canteiro) - pos(b.linha, b.canteiro) || colunaDaOrigem(a.origem) - colunaDaOrigem(b.origem)),
+    // um canteiro: ordem do controle; vários: ordem de recebimento (data), sem separar por canteiro
+    .sort((a, b) => (pares.length > 1 ? (a.data ?? '9999').localeCompare(b.data ?? '9999') : 0)
+      || pos(a.linha, a.canteiro) - pos(b.linha, b.canteiro) || colunaDaOrigem(a.origem) - colunaDaOrigem(b.origem)),
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [recebimentos, pares]);
   const mostrar = todas ? colunas : colunas.slice(-25);
@@ -238,7 +240,7 @@ function PlanilhaEntrada({ pares, recebimentos, aoAbrir, aoAbrirNF }: {
   return (
     <>
       <div className="toolbar">
-        <span className="muted">{mostrar.length} de {colunas.length} colunas, na ordem do controle{varios ? ', canteiro a canteiro' : ''} · só itens com previsto ou recebimento</span>
+        <span className="muted">{mostrar.length} de {colunas.length} colunas, {varios ? 'na ordem de recebimento' : 'na ordem do controle'} · só itens com previsto ou recebimento</span>
         <span className="grow" /><ResumoSelecao refSpan={cruz.resumoRef} />
         <button onClick={() => setTodas(!todas)}>{todas ? 'Só as 25 últimas' : 'Todas as colunas'}</button>
       </div>
@@ -248,9 +250,8 @@ function PlanilhaEntrada({ pares, recebimentos, aoAbrir, aoAbrirNF }: {
             {cab.map(([rot, f], i) => (
               <tr key={rot} className={`cab ${rot === 'Canteiro' ? 'cab-cant' : ''}`}>
                 <th className="rot" colSpan={1}>{rot}</th><th className="vazio-cab" /><th className="vazio-cab" />
-                {mostrar.map((c, j) => {
-                  const nova = varios && rot === 'Canteiro' && (j === 0 || mostrar[j - 1].canteiro !== c.canteiro || mostrar[j - 1].linha !== c.linha);
-                  return <td key={c.id} className={`cabv ${i === cab.length - 1 ? 'ult' : ''} ${nova ? 'nova' : ''}`}>{f(c)}</td>;
+                {mostrar.map((c) => {
+                  return <td key={c.id} className={`cabv ${i === cab.length - 1 ? 'ult' : ''}`}>{f(c)}</td>;
                 })}
               </tr>
             ))}
