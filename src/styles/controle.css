@@ -501,10 +501,20 @@ body:has(.lancar.conteudo) .notas-tela .titulo .sub { display: none; }
 .acoes-nf .rec-barra { display: flex; align-items: center; gap: 14px; flex-wrap: wrap; }
 
 /* ficha da NF: mais larga, resumo numa faixa, abas */
-.drawer.larga { width: min(860px, 100%); }
+.drawer.larga { width: min(660px, 100%); }
 .drawer.larga .dr-sum { display: grid; grid-template-columns: repeat(auto-fill, minmax(118px, 1fr)); gap: 0; }
 .drawer.larga .dr-sum > div { border-right: 1px solid var(--line-soft); border-bottom: 1px solid var(--line-soft); padding: 6px 10px; }
 .ficha-abas { display: flex; align-items: flex-end; gap: 12px; border-bottom: 2px solid var(--navy); margin-bottom: 10px; }
 .ficha-abas .tabs { border-bottom: 0; margin: 0; }
 .ficha-abas .arquivo { margin-left: auto; font-size: 11.5px; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 45%; padding-bottom: 4px; }
 .fluxo .acoes-nf { position: sticky; bottom: -1px; background: var(--panel); padding-bottom: 8px; z-index: 1; }
+
+/* lista de NFs no padrão das outras telas: grade, linhas baixas, valores centralizados, título fixo */
+.lista-nf { border-collapse: collapse; }
+.lista-nf thead th { position: sticky; top: 0; z-index: 2; background: var(--navy); color: #fff; font-size: 11.5px; padding: 5px 8px; text-align: center; white-space: nowrap; }
+.lista-nf td { padding: 2px 8px; font-size: 13px; line-height: 1.35; text-align: center; white-space: nowrap; border-right: 1px solid var(--line-soft); }
+.lista-nf td.num b { font-weight: 700; color: var(--navy); }
+.lista-nf td.obs { text-align: left; color: var(--muted); font-size: 12px; }
+.lista-nf td .st { font-size: 11px; padding: 1px 7px; }
+.lista-nf tbody tr.clk:hover td { background: var(--navy-tint); }
+.lista-nf td.r, .lista-nf th.r { text-align: center; }

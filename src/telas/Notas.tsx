@@ -14,6 +14,7 @@ import {
 } from '../dados/recebimento';
 
 type Vista = 'lista' | 'planilha';
+const ofCurtaTxt = (t: string | null) => (t ? t.replace(/^OF-\d+-EM-BRM-/, 'OF-') : '—');
 type Filtro = 'todas' | 'nao_recebida' | 'recebidas' | 'em_conferencia' | 'reposicao' | 'sem_controle' | 'outros';
 const FILTROS: Filtro[] = ['todas', 'nao_recebida', 'recebidas', 'em_conferencia', 'reposicao', 'sem_controle', 'outros'];
 type Linha =
@@ -89,7 +90,7 @@ export function Notas() {
       if (c === 'nf') return l.nf.numero;
       if (c === 'emissao') return data(l.nf.emissao) || '—';
       if (c === 'recebida') return data(l.nf.recebida_em) || '—';
-      if (c === 'of') return l.nf.of_texto ?? '—';
+      if (c === 'of') return ofCurtaTxt(l.nf.of_texto);
       if (c === 'destino') return l.nf.destino ?? '—';
       return l.nf.canteiro_recebimento ?? '—';
     }
@@ -135,12 +136,12 @@ export function Notas() {
       {vista === 'lista' ? (
         <>
           <div className="panel conteudo">
-            <table>
+            <table className="lista-nf">
               <thead><tr>
                 <th>{fc('situacao', 'Situação')}</th>
                 <th>{fc('nf', 'NF / documento')}</th>
                 <th>{fc('emissao', 'Emissão', ordemData)}</th><th>{fc('recebida', 'Recebida em', ordemData)}</th><th className="r">Dias</th><th>{fc('of', 'OF')}</th>
-                <th>{fc('destino', 'Destino (NF)')}</th><th>{fc('canteiro', 'Canteiro')}</th><th className="r">Peso (kg)</th><th className="r">Itens</th><th>Observações</th>
+                <th>{fc('destino', 'Destino (NF)')}</th><th>{fc('canteiro', 'Canteiro')}</th><th className="r">Peso (kg)</th><th className="r">Itens</th><th>RNC / SAC</th>
               </tr></thead>
               <tbody>
                 {visiveis.map((l) => l.k === 'nf' ? (
@@ -150,17 +151,12 @@ export function Notas() {
                     <td className="num">{data(l.nf.emissao)}</td>
                     <td className="num">{data(l.nf.recebida_em)}</td>
                     <td className="r num">{l.nf.situacao_exibida === 'nao_recebida' ? <span className="warn">{dias(l.nf.emissao)}</span> : ''}</td>
-                    <td>{l.nf.of_texto ?? '—'}</td>
+                    <td>{ofCurtaTxt(l.nf.of_texto)}</td>
                     <td>{l.nf.destino ?? '—'}</td>
-                    <td>{l.nf.canteiro_recebimento ?? '—'}</td>
+                    <td className={l.nf.destino && l.nf.canteiro_recebimento && l.nf.destino !== l.nf.canteiro_recebimento ? 'warn' : ''}>{l.nf.canteiro_recebimento ?? '—'}</td>
                     <td className="r num">{num(l.nf.peso, 1)}</td>
                     <td className="r num">{l.nf.itens || '—'}</td>
-                    <td style={{ fontSize: 13 }}>{[
-                      l.nf.rnc ? `RNC ${l.nf.rnc}` : '', l.nf.sac ? `SAC ${l.nf.sac}` : '',
-                      !l.nf.arquivo ? 'sem PDF no índice' : '',
-                      l.nf.destino && l.nf.canteiro_recebimento && l.nf.destino !== l.nf.canteiro_recebimento ? `recebida fora do destino` : '',
-                      l.nf.recebimentos > 1 ? `${l.nf.recebimentos} lançamentos` : '',
-                    ].filter(Boolean).join(' · ')}</td>
+                    <td className="obs">{[l.nf.rnc ? `RNC ${l.nf.rnc}` : '', l.nf.sac ? `SAC ${l.nf.sac}` : ''].filter(Boolean).join(' · ')}</td>
                   </tr>
                 ) : (
                   <tr key={l.id} className="clk" onClick={() => setAbertoMov(l.mov)}>
@@ -174,7 +170,7 @@ export function Notas() {
                     <td>{l.mov.canteiro}</td>
                     <td className="r num">—</td>
                     <td className="r num">{l.mov.itens}</td>
-                    <td style={{ fontSize: 13 }}>{l.mov.tipo === 'ajuste' ? 'quantidade lançada na coluna E da ENTRADA' : ''}</td>
+                    <td className="obs" />
                   </tr>
                 ))}
               </tbody>
