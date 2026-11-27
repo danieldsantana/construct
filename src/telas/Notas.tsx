@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useLayoutEffect, useMemo, useState, type ReactNode } from 'react';
+import { createPortal } from 'react-dom';
 import { useSearchParams } from 'react-router';
 import { Abas, Titulo } from '../componentes/Titulo';
 import { Gaveta } from '../componentes/Gaveta';
@@ -36,6 +37,7 @@ export function Notas() {
   const rec = useRecebimentos();
   const [vista, setVista] = useState<Vista>('lista');
   const editor = useEditor();
+  const [slot, setSlot] = useState<HTMLDivElement | null>(null);
   const [params] = useSearchParams();  // ?filtro=nao_recebida&nf=<id> (links da tela Início)
   const [filtro, setFiltro] = useState<Filtro>(() => {
     const f = params.get('filtro') as Filtro | null;
@@ -92,21 +94,20 @@ export function Notas() {
   const filtros: [Filtro, string][] = [['todas', 'Todas'], ['nao_recebida', 'Emitidas (não recebidas)'], ['recebidas', 'Recebidas'], ['em_conferencia', 'Em conferência'], ['reposicao', 'Reposições (SAC)'], ['sem_controle', 'Sem controle importado'], ['outros', 'Transferências e ajustes']];
 
   const abas = <Abas<Vista> abas={[['lista', 'Notas fiscais'], ['planilha', 'Planilha de entrada'], ...(editor ? [['lancar', 'Lançar NF'] as [Vista, string]] : [])]} atual={vista} aoMudar={setVista} />;
+  const controles = vista === 'lista' ? (
+    <div className="chips">
+      {filtros.filter(([k]) => k === 'todas' || linhas.some((l) => passa(l, k))).map(([k, t]) => (
+        <button key={k} className={`chip ${filtro === k ? 'on' : ''}`} onClick={() => setFiltro(k)}>{t}<span className="n">{linhas.filter((l) => passa(l, k)).length}</span></button>
+      ))}
+    </div>
+  ) : <div className="titulo-slot" ref={setSlot} />;
   return (
-    <div className={`notas-tela ${vista === 'planilha' ? 'cheia' : ''}`}>
-      <Titulo texto="Notas fiscais"><span className="num">{visiveis.length}</span></Titulo>
-      {vista !== 'planilha' && abas}
+    <div className="notas-tela cheia">
+      <Titulo texto="Notas fiscais" meio={<div className="titulo-abas">{abas}</div>}>{controles}</Titulo>
 
       {vista === 'lancar' ? <LancarNF /> : vista === 'lista' ? (
         <>
-          <div className="toolbar">
-            <div className="chips">
-              {filtros.filter(([k]) => k === 'todas' || linhas.some((l) => passa(l, k))).map(([k, t]) => (
-                <button key={k} className={`chip ${filtro === k ? 'on' : ''}`} onClick={() => setFiltro(k)}>{t}<span className="n">{linhas.filter((l) => passa(l, k)).length}</span></button>
-              ))}
-            </div>
-          </div>
-          <div className="panel" style={{ overflow: 'auto', maxHeight: 'calc(100vh - 290px)' }}>
+          <div className="panel conteudo">
             <table>
               <thead><tr>
                 <th>Situação</th><th>NF / documento</th><th>Emissão</th><th>Recebida em</th><th className="r">Dias</th><th>OF</th>
@@ -152,7 +153,7 @@ export function Notas() {
           </div>
         </>
       ) : (
-        <PlanilhaEntrada abas={abas} pares={paresEscopo} aoAbrir={setAbertoMov} aoAbrirNF={(id) => setAbertaNF(nfs.dados.find((x) => x.id === id) ?? null)}
+        <PlanilhaEntrada slot={slot} pares={paresEscopo} aoAbrir={setAbertoMov} aoAbrirNF={(id) => setAbertaNF(nfs.dados.find((x) => x.id === id) ?? null)}
                          recebimentos={rec.dados.filter((r) => inclui(r.linha, r.canteiro))} />
       )}
 
@@ -165,8 +166,8 @@ export function Notas() {
 // Planilha de entrada como a aba ENTRADA do controle: cabeçalho completo por coluna (data de recebimento, fornecedor, NF,
 // emissão, romaneio, valor, peso, OF) e uma coluna por recebimento. Com vários canteiros no escopo, uma linha a mais no
 // cabeçalho diz o canteiro de recebimento de cada coluna, e previsto/recebido são a soma dos canteiros.
-function PlanilhaEntrada({ abas, pares, recebimentos, aoAbrir, aoAbrirNF }: {
-  abas: ReactNode;
+function PlanilhaEntrada({ slot, pares, recebimentos, aoAbrir, aoAbrirNF }: {
+  slot: HTMLElement | null;
   pares: { linha: string; canteiro: string }[]; recebimentos: Recebimento[]; aoAbrir: (r: Recebimento) => void; aoAbrirNF: (nfId: number) => void;
 }) {
   const saldos = useSaldos();
@@ -250,23 +251,17 @@ function PlanilhaEntrada({ abas, pares, recebimentos, aoAbrir, aoAbrirNF }: {
   let parteAnt: string | null = null;
   return (
     <>
-      <div className="panel planilha">
+      {slot && createPortal(
+        <>
+          <ResumoSelecao refSpan={cruz.resumoRef} />
+          <label className="chk"><input type="checkbox" checked={soRecebidos} onChange={(e) => setSoRecebidos(e.target.checked)} /> Só itens recebidos</label>
+        </>, slot)}
+      <div className="panel planilha conteudo">
         <table ref={tabRef} className="cruz" onMouseDown={cruz.onMouseDown} onMouseOver={cruz.onMouseOver} onMouseLeave={cruz.onMouseLeave}>
           <thead>
             {cab.map(([rot, f], i) => (
               <tr key={rot} className={`cab ${rot === 'Nota fiscal' ? 'cab-nf' : ''}`}>
-                {i === 0 && (
-                  <th className="canto" rowSpan={cab.length}>
-                    <div className="canto-c">
-                      {abas}
-                      <div className="canto-f">
-                        <label className="chk"><input type="checkbox" checked={soRecebidos} onChange={(e) => setSoRecebidos(e.target.checked)} /> Só itens recebidos</label>
-                        <ResumoSelecao refSpan={cruz.resumoRef} />
-                      </div>
-                    </div>
-                  </th>
-                )}
-                <th className="rot" colSpan={2}>{rot}</th>
+                <th className="rot" colSpan={3}>{rot}</th>
                 {mostrar.map((c) => <td key={c.id} className={`cabv ${i === cab.length - 1 ? 'ult' : ''}`}>{f(c)}</td>)}
               </tr>
             ))}

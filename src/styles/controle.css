@@ -373,3 +373,17 @@ main:has(> .notas-tela.cheia) { overflow: hidden; padding-bottom: 12px; display:
   main:has(> .notas-tela.cheia) { overflow: auto; display: block; }
   .notas-tela.cheia > .planilha { max-height: 70vh; }
 }
+
+/* Notas: mesma moldura nas 3 abas — abas na faixa do título, controles da aba à direita, conteúdo na altura toda */
+.titulo-abas .tabs { margin: 0; border: 0; gap: 2px; }
+.titulo-abas .tabs button { color: #fff; opacity: .85; border: 1px solid transparent; padding: 3px 12px; font-size: 13.5px; }
+.titulo-abas .tabs button:hover { opacity: 1; background: rgba(255,255,255,.15); }
+.titulo-abas .tabs button.on { background: #fff; color: var(--orange); opacity: 1; font-weight: 700; }
+.titulo .chips .chip { background: rgba(255,255,255,.12); color: #fff; border-color: rgba(255,255,255,.5); }
+.titulo .chips .chip.on { background: #fff; color: var(--navy); border-color: #fff; }
+.titulo .titulo-slot { display: flex; align-items: center; gap: 14px; }
+.titulo .titulo-slot .resumo-sel { color: #fff; }
+.titulo .titulo-slot label.chk { color: #fff; }
+.notas-tela.cheia > .conteudo { flex: 1 1 auto; min-height: 0; overflow: auto; }
+.notas-tela.cheia > .lancar.conteudo { display: flex; flex-direction: column; }
+.notas-tela.cheia > .lancar.conteudo > .lancar-grade { flex: 1 1 auto; min-height: 0; max-height: none; }

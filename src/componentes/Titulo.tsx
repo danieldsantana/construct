@@ -2,12 +2,13 @@ import type { ReactNode } from 'react';
 import { useEscopo } from '../lib/escopo';
 
 // Faixa laranja de título, como no topo das abas do controle.
-export function Titulo({ texto, children }: { texto: string; children?: ReactNode }) {
+export function Titulo({ texto, children, meio }: { texto: string; children?: ReactNode; meio?: ReactNode }) {
   const { nome } = useEscopo();
   return (
     <div className="titulo">
       <h1>{texto}</h1>
       <span className="sub">{nome}</span>
+      {meio}
       <span className="grow" />
       {children}
     </div>

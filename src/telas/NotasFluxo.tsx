@@ -151,7 +151,7 @@ export function LancarNF() {
   };
   let secao = '';
   return (
-    <div className="lancar">
+    <div className="lancar conteudo">
       <div className="panel" style={{ padding: 12, marginBottom: 10 }}>
         <div className="campos">
           <label>Nota fiscal <input value={cab.numero} inputMode="numeric" onChange={(e) => setCab({ ...cab, numero: e.target.value.replace(/\D/g, '') })} /></label>
