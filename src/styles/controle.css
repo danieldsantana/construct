@@ -356,3 +356,20 @@ button.pri:disabled { opacity: .5; }
 .planilha button.nfnum.transf { font-weight: 600; color: var(--muted); font-size: 11px; }
 .planilha thead tr.tit th.colv { font-weight: 600; font-size: 11px; cursor: default; }
 .planilha thead tr.tit th.colv:hover { background: var(--navy); text-decoration: none; }
+
+/* Planilha de entrada ocupa a altura da tela; abas, filtro e soma no canto do cabeçalho */
+.notas-tela { display: grid; grid-template-columns: minmax(0, 1fr); min-width: 0; }
+main:has(> .notas-tela.cheia) { overflow: hidden; padding-bottom: 12px; display: flex; flex-direction: column; }
+.notas-tela.cheia { flex: 1; min-height: 0; display: flex; flex-direction: column; }
+.notas-tela.cheia > * { flex: 0 0 auto; }
+.notas-tela.cheia > .planilha { flex: 1 1 auto; min-height: 0; overflow: auto; }
+.planilha thead th.canto { background: var(--panel); vertical-align: bottom; padding: 4px 6px 4px 0; text-align: left; text-transform: none;
+  letter-spacing: 0; font-weight: 400; color: var(--ink); box-shadow: inset 0 -2px 0 var(--navy); }
+.planilha .canto-c { display: grid; gap: 6px; }
+.planilha .canto-c .tabs { margin: 0; border-bottom: 0; flex-wrap: nowrap; }
+.planilha .canto-c .tabs button { padding: 4px 10px; font-size: 13px; }
+.planilha .canto-f { display: flex; gap: 12px; align-items: center; padding-left: 4px; font-size: 12.5px; }
+@media (max-width: 800px) {
+  main:has(> .notas-tela.cheia) { overflow: auto; display: block; }
+  .notas-tela.cheia > .planilha { max-height: 70vh; }
+}

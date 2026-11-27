@@ -1,5 +1,4 @@
 import { useCallback, useEffect, useLayoutEffect, useMemo, useState, type ReactNode } from 'react';
-import { createPortal } from 'react-dom';
 import { useSearchParams } from 'react-router';
 import { Abas, Titulo } from '../componentes/Titulo';
 import { Gaveta } from '../componentes/Gaveta';
@@ -37,7 +36,6 @@ export function Notas() {
   const rec = useRecebimentos();
   const [vista, setVista] = useState<Vista>('lista');
   const editor = useEditor();
-  const [slotAbas, setSlotAbas] = useState<HTMLDivElement | null>(null);
   const [params] = useSearchParams();  // ?filtro=nao_recebida&nf=<id> (links da tela Início)
   const [filtro, setFiltro] = useState<Filtro>(() => {
     const f = params.get('filtro') as Filtro | null;
@@ -93,13 +91,11 @@ export function Notas() {
 
   const filtros: [Filtro, string][] = [['todas', 'Todas'], ['nao_recebida', 'Emitidas (não recebidas)'], ['recebidas', 'Recebidas'], ['em_conferencia', 'Em conferência'], ['reposicao', 'Reposições (SAC)'], ['sem_controle', 'Sem controle importado'], ['outros', 'Transferências e ajustes']];
 
+  const abas = <Abas<Vista> abas={[['lista', 'Notas fiscais'], ['planilha', 'Planilha de entrada'], ...(editor ? [['lancar', 'Lançar NF'] as [Vista, string]] : [])]} atual={vista} aoMudar={setVista} />;
   return (
-    <>
+    <div className={`notas-tela ${vista === 'planilha' ? 'cheia' : ''}`}>
       <Titulo texto="Notas fiscais"><span className="num">{visiveis.length}</span></Titulo>
-      <div className="abas-linha">
-        <Abas<Vista> abas={[['lista', 'Notas fiscais'], ['planilha', 'Planilha de entrada'], ...(editor ? [['lancar', 'Lançar NF'] as [Vista, string]] : [])]} atual={vista} aoMudar={setVista} />
-        <div className="abas-extra" ref={setSlotAbas} />
-      </div>
+      {vista !== 'planilha' && abas}
 
       {vista === 'lancar' ? <LancarNF /> : vista === 'lista' ? (
         <>
@@ -156,21 +152,21 @@ export function Notas() {
           </div>
         </>
       ) : (
-        <PlanilhaEntrada slot={slotAbas} pares={paresEscopo} aoAbrir={setAbertoMov} aoAbrirNF={(id) => setAbertaNF(nfs.dados.find((x) => x.id === id) ?? null)}
+        <PlanilhaEntrada abas={abas} pares={paresEscopo} aoAbrir={setAbertoMov} aoAbrirNF={(id) => setAbertaNF(nfs.dados.find((x) => x.id === id) ?? null)}
                          recebimentos={rec.dados.filter((r) => inclui(r.linha, r.canteiro))} />
       )}
 
       <FichaNF nf={abertaNF} recebimentos={rec.dados} aoFechar={fechar} />
       <FichaRecebimento r={abertoMov} aoFechar={fechar} />
-    </>
+    </div>
   );
 }
 
 // Planilha de entrada como a aba ENTRADA do controle: cabeçalho completo por coluna (data de recebimento, fornecedor, NF,
 // emissão, romaneio, valor, peso, OF) e uma coluna por recebimento. Com vários canteiros no escopo, uma linha a mais no
 // cabeçalho diz o canteiro de recebimento de cada coluna, e previsto/recebido são a soma dos canteiros.
-function PlanilhaEntrada({ slot, pares, recebimentos, aoAbrir, aoAbrirNF }: {
-  slot: HTMLElement | null;
+function PlanilhaEntrada({ abas, pares, recebimentos, aoAbrir, aoAbrirNF }: {
+  abas: ReactNode;
   pares: { linha: string; canteiro: string }[]; recebimentos: Recebimento[]; aoAbrir: (r: Recebimento) => void; aoAbrirNF: (nfId: number) => void;
 }) {
   const saldos = useSaldos();
@@ -190,16 +186,20 @@ function PlanilhaEntrada({ slot, pares, recebimentos, aoAbrir, aoAbrirNF }: {
     const tit = t.tHead.rows[t.tHead.rows.length - 1];
     const w = [0, 1, 2].map((i) => tit.cells[i]?.offsetWidth ?? 0);
     const esq = [0, w[0], w[0] + w[1]];
-    for (const tr of t.rows) {
+    const ocupado: number[][] = [];  // colunas tomadas por rowSpan de linhas anteriores
+    [...t.rows].forEach((tr, r) => {
       let col = 0;
       for (const c of tr.cells) {
-        if (col >= 3 || col + c.colSpan > 3) break;
-        c.style.position = 'sticky'; c.style.left = `${esq[col]}px`;
-        c.style.zIndex = tr.parentElement === t.tHead ? '4' : '1';
+        while (ocupado[r]?.includes(col)) col++;
+        const ini = col;
+        for (let k = 1; k < c.rowSpan; k++) for (let x = 0; x < c.colSpan; x++) (ocupado[r + k] ??= []).push(ini + x);
         col += c.colSpan;
+        if (ini >= 3 || col > 3) continue;
+        c.style.position = 'sticky'; c.style.left = `${esq[ini]}px`;
+        c.style.zIndex = tr.parentElement === t.tHead ? '4' : '1';
         if (col === 3) c.classList.add('ult-cong');
       }
-    }
+    });
   });
   const variasLinhas = new Set(pares.map((p) => p.linha)).size > 1;
   const pos = (l: string, c: string) => pares.findIndex((p) => p.linha === l && p.canteiro === c);
@@ -250,17 +250,23 @@ function PlanilhaEntrada({ slot, pares, recebimentos, aoAbrir, aoAbrirNF }: {
   let parteAnt: string | null = null;
   return (
     <>
-      {slot && createPortal(
-        <>
-          <ResumoSelecao refSpan={cruz.resumoRef} />
-          <label className="chk"><input type="checkbox" checked={soRecebidos} onChange={(e) => setSoRecebidos(e.target.checked)} /> Só itens recebidos</label>
-        </>, slot)}
-      <div className="panel planilha" style={{ overflow: 'auto', maxHeight: 'calc(100vh - 300px)' }}>
+      <div className="panel planilha">
         <table ref={tabRef} className="cruz" onMouseDown={cruz.onMouseDown} onMouseOver={cruz.onMouseOver} onMouseLeave={cruz.onMouseLeave}>
           <thead>
             {cab.map(([rot, f], i) => (
               <tr key={rot} className={`cab ${rot === 'Nota fiscal' ? 'cab-nf' : ''}`}>
-                <th className="rot" colSpan={3}>{rot}</th>
+                {i === 0 && (
+                  <th className="canto" rowSpan={cab.length}>
+                    <div className="canto-c">
+                      {abas}
+                      <div className="canto-f">
+                        <label className="chk"><input type="checkbox" checked={soRecebidos} onChange={(e) => setSoRecebidos(e.target.checked)} /> Só itens recebidos</label>
+                        <ResumoSelecao refSpan={cruz.resumoRef} />
+                      </div>
+                    </div>
+                  </th>
+                )}
+                <th className="rot" colSpan={2}>{rot}</th>
                 {mostrar.map((c) => <td key={c.id} className={`cabv ${i === cab.length - 1 ? 'ult' : ''}`}>{f(c)}</td>)}
               </tr>
             ))}
