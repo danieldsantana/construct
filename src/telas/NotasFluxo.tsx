@@ -1,12 +1,11 @@
 import { useMemo, useState } from 'react';
 import { useEditor } from '../lib/sessao';
-import { useEscopo } from '../lib/escopo';
 import { num } from '../lib/formato';
 import {
   confirmarNF, desfazerRecebimento, marcarRecebida, salvarNF, useNFItens, usePendencias, useSaldos,
   type NotaFiscal, type PendenciaNova,
 } from '../dados/recebimento';
-import { useOFs } from '../dados/ofs';
+import { ofCurta, useOFs } from '../dados/ofs';
 
 const hoje = () => new Date().toISOString().slice(0, 10);
 const n = (v: number | string | null | undefined) => Number(v ?? 0);
@@ -135,11 +134,10 @@ const deBR = (texto: string) => texto.replace(/\./g, '').replace(',', '.');
 // ---------- Lançar NF manualmente: uma "coluna da ENTRADA" (cabeçalho + quantidade por item, na ordem do controle) ----------
 export function LancarNF() {
   const editor = useEditor();
-  const { escopo } = useEscopo();
   const saldos = useSaldos();
   const [cab, setCab] = useState({ numero: '', emissao: '', of: '', romaneio: '', valor: '', peso: '' });
-  const [linha, setLinha] = useState(escopo.linha || 'T4');
-  const [destino, setDestino] = useState(escopo.canteiro || '');
+  const [linha, setLinha] = useState('');
+  const [destino, setDestino] = useState('');
   const [qtd, setQtd] = useState<Record<number, string>>({});
   const [msg, setMsg] = useState<string | null>(null);
   const [ocupado, setOcupado] = useState(false);
@@ -168,20 +166,21 @@ export function LancarNF() {
         <div className="campos">
           <label>Nota fiscal <input value={cab.numero} inputMode="numeric" onChange={(e) => setCab({ ...cab, numero: e.target.value.replace(/\D/g, '') })} /></label>
           <label>Data de emissão <input type="date" value={cab.emissao} onChange={(e) => setCab({ ...cab, emissao: e.target.value })} /></label>
-          <label>OF <input value={cab.of} list="ofs-linha" onChange={(e) => setCab({ ...cab, of: e.target.value })} />
-            <datalist id="ofs-linha">{ofsLinha.map((o) => <option key={o.id} value={o.codigo}>{[o.canteiro, o.entrega_texto].filter(Boolean).join(' · ')}</option>)}</datalist></label>
+          <label>Linha <select value={linha} onChange={(e) => { setLinha(e.target.value); setDestino(''); setQtd({}); setCab({ ...cab, of: '' }); }}>
+            <option value="">—</option><option>T3</option><option>T4</option></select></label>
+          <label>Canteiro de destino <select value={destino} disabled={!linha} onChange={(e) => { setDestino(e.target.value); setQtd({}); }}>
+            <option value="">—</option>{canteiros.map((c) => <option key={c}>{c}</option>)}</select></label>
+          <label>OF <select value={cab.of} disabled={!linha} onChange={(e) => setCab({ ...cab, of: e.target.value })}>
+            <option value="">—</option>{ofsLinha.map((o) => <option key={o.id} value={o.codigo}>{[ofCurta(o), o.canteiro].filter(Boolean).join(' · ')}</option>)}</select></label>
           <label>Remessa <input value={cab.romaneio} onChange={(e) => setCab({ ...cab, romaneio: e.target.value })} /></label>
           <label>Valor NF <span className="campo-pre"><i>R$</i><input value={cab.valor} inputMode="decimal" onChange={(e) => setCab({ ...cab, valor: numeroBR(e.target.value, 2) })} /></span></label>
           <label>Peso NF (kg) <input value={cab.peso} inputMode="decimal" onChange={(e) => setCab({ ...cab, peso: numeroBR(e.target.value, 3) })} /></label>
-          <label>Linha <select value={linha} onChange={(e) => { setLinha(e.target.value); setDestino(''); setQtd({}); }}><option>T3</option><option>T4</option></select></label>
-          <label>Canteiro de destino <select value={destino} onChange={(e) => { setDestino(e.target.value); setQtd({}); }}>
-            <option value="">—</option>{canteiros.map((c) => <option key={c}>{c}</option>)}</select></label>
         </div>
         <div className="linha-acao" style={{ marginTop: 8 }}>
           <span className="num">Peso pelos itens: <b>{num(peso, 1)} kg</b>{cab.peso && <> · NF: <b>{num(Number(deBR(cab.peso)), 1)} kg</b>
             {Math.abs(peso - Number(deBR(cab.peso))) > 1 && <span className="warn"> (diferença {num(peso - Number(deBR(cab.peso)), 1)} kg — fixadores sem peso cadastrado não entram)</span>}</>}</span>
           <span className="grow" />
-          <button className="pri" disabled={ocupado || !cab.numero || !destino || !preenchidos.length} onClick={salvar}>Lançar como emitida</button>
+          <button className="pri" disabled={ocupado || !cab.numero || !destino || !cab.of || !preenchidos.length} onClick={salvar}>Lançar como emitida</button>
         </div>
         {msg && <div className={msg.startsWith('Não foi') ? 'callout' : 'notes'} style={{ marginTop: 8 }}>{msg}</div>}
       </div>

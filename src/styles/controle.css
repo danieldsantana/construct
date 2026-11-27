@@ -408,3 +408,7 @@ main:has(> .notas-tela.cheia) { overflow: hidden; padding-bottom: 12px; display:
 .campo-pre { display: flex; align-items: center; border: 1px solid var(--line); background: #fff; border-radius: 3px; }
 .campo-pre i { font-style: normal; color: var(--muted); padding: 0 2px 0 8px; }
 .campo-pre input { border: 0 !important; flex: 1; min-width: 0; }
+
+/* Lançar NF: linha e destino vêm da própria nota, não do escopo global */
+body:has(.lancar.conteudo) .scopebar { display: none; }
+.notas-tela:has(> .lancar.conteudo) .titulo .sub { display: none; }
