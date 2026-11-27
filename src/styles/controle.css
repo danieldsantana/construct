@@ -410,5 +410,6 @@ main:has(> .notas-tela.cheia) { overflow: hidden; padding-bottom: 12px; display:
 .campo-pre input { border: 0 !important; flex: 1; min-width: 0; }
 
 /* Lançar NF: linha e destino vêm da própria nota, não do escopo global */
-body:has(.lancar.conteudo) .scopebar { display: none; }
+body:has(.lancar.conteudo) .scopebar { opacity: .4; pointer-events: none; }
+body:has(.lancar.conteudo) .scopebar button.on { background: transparent; color: inherit; border-color: var(--line); font-weight: inherit; }
 .notas-tela:has(> .lancar.conteudo) .titulo .sub { display: none; }
