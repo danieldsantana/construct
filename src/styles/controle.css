@@ -518,3 +518,8 @@ body:has(.lancar.conteudo) .notas-tela .titulo .sub { display: none; }
 .lista-nf td .st { font-size: 11px; padding: 1px 7px; }
 .lista-nf tbody tr.clk:hover td { background: var(--navy-tint); }
 .lista-nf td.r, .lista-nf th.r { text-align: center; }
+/* ficha da NF: resumo em 4 colunas (4 em cima, 4 embaixo), compacto */
+.drawer.larga .dr-sum { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+.drawer.larga .dr-sum > div { padding: 4px 10px; display: grid; gap: 1px; }
+.drawer.larga .dr-sum > div > span { font-size: 11px; }
+.drawer.larga .dr-sum > div > b { font-size: 13.5px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
