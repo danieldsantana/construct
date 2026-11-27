@@ -24,11 +24,20 @@ const emAndamento = new Map<string, Promise<unknown[]>>();
 // Depois de um lançamento (NF, recebimento, confirmação…): limpa o cache e avisa as telas abertas para buscar de novo.
 let versao = 0;
 const ouvintes = new Set<() => void>();
+let ultimaRecarga = Date.now();
 export function recarregarDados() {
   cache.clear();
   emAndamento.clear();
   versao += 1;
+  ultimaRecarga = Date.now();
   ouvintes.forEach((f) => f());
+}
+
+// Outra aba (ou outra pessoa) pode ter lançado algo: ao voltar para esta aba, busca de novo (no máximo a cada 20 s).
+if (typeof window !== 'undefined') {
+  const aoVoltar = () => { if (document.visibilityState === 'visible' && Date.now() - ultimaRecarga > 20000) recarregarDados(); };
+  window.addEventListener('focus', aoVoltar);
+  document.addEventListener('visibilitychange', aoVoltar);
 }
 
 // Carrega uma tabela/consulta inteira uma vez por sessão; filtros e buscas rodam no navegador.

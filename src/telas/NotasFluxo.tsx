@@ -455,7 +455,7 @@ export function LancarNF({ slot }: { slot: HTMLElement | null }) {
           <table ref={cruz.ref} className="cruz" onMouseDown={cruz.onMouseDown} onMouseOver={cruz.onMouseOver} onMouseLeave={cruz.onMouseLeave}>
             <thead><tr className="tit">
               <th>{<FiltroColuna titulo="Descrição" valores={doTipo.map((i) => i.descricao)} selecionados={filtroDesc} aoMudar={setFiltroDesc} />}</th>
-              <th className="r">Previsto</th><th className="r">Recebido</th><th className="nfcolh">{cab.numero}</th>
+              <th className="r">Previsto</th><th className="r">Recebido</th><th className="nfcolh">{cab.numero ? `NF - ${cab.numero}` : '-'}</th>
             </tr></thead>
             <tbody>{visiveis.flatMap((i) => {
               const out = [];
