@@ -3,6 +3,7 @@ import { createPortal } from 'react-dom';
 import { useSearchParams } from 'react-router';
 import { Abas, Titulo } from '../componentes/Titulo';
 import { Gaveta } from '../componentes/Gaveta';
+import { FiltroColuna } from '../componentes/FiltroColuna';
 import { AcoesNF, LancarNF } from './NotasFluxo';
 import { ResumoSelecao, useTabelaCruz } from '../componentes/TabelaCruz';
 import { useEditor } from '../lib/sessao';
@@ -82,9 +83,33 @@ export function Notas() {
     const s = l.nf.situacao_exibida;
     return f === 'recebidas' ? s === 'confirmada' || s === 'em_conferencia' : s === f;
   };
-  const visiveis = useMemo(() => linhas.filter((l) => passa(l, filtro)).sort((a, b) => b.quando.localeCompare(a.quando)),
+  // filtros de coluna (autofiltro): valor da célula de cada coluna filtrável
+  type Col = 'situacao' | 'of' | 'destino' | 'canteiro';
+  const valorCol = (l: Linha, c: Col): string => {
+    if (l.k === 'nf') {
+      if (c === 'situacao') return SITUACAO[l.nf.situacao_exibida][0];
+      if (c === 'of') return l.nf.of_texto ?? '—';
+      if (c === 'destino') return l.nf.destino ?? '—';
+      return l.nf.canteiro_recebimento ?? '—';
+    }
+    if (c === 'situacao') return l.mov.tipo === 'ajuste' ? 'Ajuste' : 'Transferência';
+    return c === 'canteiro' ? l.mov.canteiro : '—';
+  };
+  const [filtrosCol, setFiltrosCol] = useState<Partial<Record<Col, Set<string> | null>>>({});
+  const [buscaNF, setBuscaNF] = useState('');
+  const doChip = useMemo(() => linhas.filter((l) => passa(l, filtro)),
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [linhas, filtro]);
+  const visiveis = useMemo(() => doChip
+    .filter((l) => (Object.entries(filtrosCol) as [Col, Set<string> | null][]).every(([c, sel]) => !sel || sel.has(valorCol(l, c))))
+    .filter((l) => !buscaNF.trim() || (l.k === 'nf' ? l.nf.numero : l.mov.documento ?? '').includes(buscaNF.trim()))
+    .sort((a, b) => b.quando.localeCompare(a.quando)),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [doChip, filtrosCol, buscaNF]);
+  const fc = (c: Col, titulo: string) => (
+    <FiltroColuna titulo={titulo} valores={doChip.map((l) => valorCol(l, c))} selecionados={filtrosCol[c] ?? null}
+                  aoMudar={(sel) => setFiltrosCol((f) => ({ ...f, [c]: sel }))} />
+  );
 
   const carregando = nfs.carregando || rec.carregando;
   const erro = nfs.erro ?? rec.erro;
@@ -110,8 +135,10 @@ export function Notas() {
           <div className="panel conteudo">
             <table>
               <thead><tr>
-                <th>Situação</th><th>NF / documento</th><th>Emissão</th><th>Recebida em</th><th className="r">Dias</th><th>OF</th>
-                <th>Destino (NF)</th><th>Canteiro</th><th className="r">Peso (kg)</th><th className="r">Itens</th><th>Observações</th>
+                <th>{fc('situacao', 'Situação')}</th>
+                <th><span className="filtro-col">NF / documento <input className="fc-busca" placeholder="buscar" value={buscaNF} onChange={(e) => setBuscaNF(e.target.value.replace(/\D/g, ''))} /></span></th>
+                <th>Emissão</th><th>Recebida em</th><th className="r">Dias</th><th>{fc('of', 'OF')}</th>
+                <th>{fc('destino', 'Destino (NF)')}</th><th>{fc('canteiro', 'Canteiro')}</th><th className="r">Peso (kg)</th><th className="r">Itens</th><th>Observações</th>
               </tr></thead>
               <tbody>
                 {visiveis.map((l) => l.k === 'nf' ? (
