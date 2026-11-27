@@ -1,11 +1,11 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useEditor } from '../lib/sessao';
 import { num } from '../lib/formato';
 import {
   confirmarNF, desfazerRecebimento, marcarRecebida, salvarNF, sugerirItens, useCanteiros, useNFItens, useNotasFiscais, usePendencias, useSaldos,
   type NotaFiscal, type PendenciaNova,
 } from '../dados/recebimento';
-import { lerNFs, problemasRomaneio, type LeituraNF } from '../lib/lerNF';
+import { lerNFsDeArquivos, problemasRomaneio, type LeituraNF } from '../lib/lerNF';
 import { paginasDoPdf } from '../lib/pdfTexto';
 import { ofCurta, useOFs } from '../dados/ofs';
 import { useLinhas } from '../dados/torres';
@@ -139,7 +139,7 @@ function numeroBR(texto: string, casas: number): string {
 const deBR = (texto: string) => texto.replace(/\./g, '').replace(',', '.');
 const paraBR = (v: number | null, casas: number) => (v === null ? '' : v.toLocaleString('pt-BR', { minimumFractionDigits: casas, maximumFractionDigits: casas }));
 const normaliza = (t: string | null | undefined) => (t ?? '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[–—]/g, '-').replace(/\s+/g, ' ').trim().toUpperCase();
-type Lida = { arquivo: string; l: LeituraNF };
+type Lida = { arquivo: string; l: LeituraNF; arquivos: string[] };
 type SemPar = { seq: number; descricao: string; quantidade: number; como: string };
 
 // ---------- Lançar NF manualmente: uma "coluna da ENTRADA" (cabeçalho + quantidade por item, na ordem do controle) ----------
@@ -173,6 +173,11 @@ export function LancarNF({ slot }: { slot: HTMLElement | null }) {
   const [atual, setAtual] = useState<Lida | null>(null);
   const [semPar, setSemPar] = useState<SemPar[]>([]);
   const [lendo, setLendo] = useState(false);
+  // PDFs ficam só na memória do navegador enquanto a tela está aberta (endereço temporário para o visualizador)
+  const urls = useRef(new Map<string, string>());
+  const [verPdf, setVerPdf] = useState(true);
+  const [pdfAberto, setPdfAberto] = useState<string | null>(null);
+  useEffect(() => () => { for (const u of urls.current.values()) URL.revokeObjectURL(u); }, []);
   const [arrastando, setArrastando] = useState(false);
   useEffect(() => {
     if (!aviso) return;
@@ -206,7 +211,7 @@ export function LancarNF({ slot }: { slot: HTMLElement | null }) {
   // ---------- leitura do PDF: preenche cabeçalho, linha, destino, OF e as quantidades sugeridas pelo romaneio ----------
   const aplicar = async (x: Lida) => {
     const l = x.l;
-    setAtual(x); setMsg(null); setTipo(''); setFiltroDesc(null); setSemPar([]); setQtd({});
+    setAtual(x); setPdfAberto(x.arquivos[0] ?? null); setMsg(null); setTipo(''); setFiltroDesc(null); setSemPar([]); setQtd({});
     const nOF = Number(l.oc?.match(/BRM-(\d+)/)?.[1] ?? l.oc?.match(/^\s*OF\s*-\s*(\d+)/)?.[1] ?? NaN);
     const doLt = linhas.dados.find((li) => l.lt && normaliza(l.lt).startsWith(normaliza(li.nome)))?.sigla;
     const cands = ofs.dados.filter((o) => o.numero === nOF);
@@ -221,7 +226,7 @@ export function LancarNF({ slot }: { slot: HTMLElement | null }) {
       return;
     }
     try {
-      const sug = await sugerirItens(lin, can, l.romaneio.map((r) => ({ seq: r.seq, sku: r.sku, descricao: r.descricao, descricao_pa: r.descricao_pa, tipo_ud: r.tipo_ud })));
+      const sug = await sugerirItens(lin, can, l.romaneio.map((r) => ({ seq: r.seq, sku: r.sku, descricao: r.descricao, descricao_pa: r.descricao_pa, tipo_ud: r.tipo_ud, peso_unit: r.peso_unit })));
       const porSeq = new Map(sug.map((g) => [g.seq, g]));
       const q: Record<number, number> = {};
       const sem: SemPar[] = [];
@@ -239,8 +244,13 @@ export function LancarNF({ slot }: { slot: HTMLElement | null }) {
     if (!pdfs.length) return;
     setLendo(true); setMsg(null);
     try {
-      const novas: Lida[] = [];
-      for (const a of pdfs) for (const l of lerNFs(await paginasDoPdf(a))) novas.push({ arquivo: a.name, l });
+      const lidosArq = [];
+      for (const a of pdfs) lidosArq.push({ nome: a.name, paginas: await paginasDoPdf(a) });
+      for (const u of urls.current.values()) URL.revokeObjectURL(u);
+      urls.current = new Map(pdfs.map((a) => [a.name, URL.createObjectURL(a)]));
+      const novas: Lida[] = lerNFsDeArquivos(lidosArq);
+      const semNF = lidosArq.filter((a) => !novas.some((x) => x.arquivos.includes(a.nome)));
+      if (semNF.length) novas.push(...semNF.map((a) => ({ arquivo: a.nome, arquivos: [a.nome], l: { erro: 'sem NF correspondente' } as LeituraNF })));
       const erros = novas.filter((x) => x.l.erro || !x.l.nf);
       if (erros.length) setMsg(`Não foi possível ler: ${erros.map((x) => `${x.arquivo} (${x.l.erro ?? 'número da NF não encontrado'})`).join(', ')}`);
       const ok = novas.filter((x) => !x.l.erro && x.l.nf);
@@ -248,6 +258,7 @@ export function LancarNF({ slot }: { slot: HTMLElement | null }) {
       if (ok.length) await aplicar(ok[0]);
     } catch (e) { setMsg(`Não foi possível ler o PDF: ${(e as Error).message}`); } finally { setLendo(false); }
   };
+  const mostraPdf = verPdf && !!atual && atual.arquivos.some((a) => urls.current.has(a));
   // NF de reposição (SAC) não traz OF no DANFE: lança sem OF
   const semOFnoDanfe = !!atual && !/BRM-\d+|^\s*OF\s*-\s*\d+/.test(atual.l.oc ?? '');
   const jaCadastrada = (nf: string | null) => nfsCad.dados.some((x) => x.numero === nf && (x.itens > 0 || x.recebida_em));
@@ -266,22 +277,26 @@ export function LancarNF({ slot }: { slot: HTMLElement | null }) {
       setCab({ numero: '', emissao: '', of: '', romaneio: '', valor: '', peso: '' }); setQtd({}); setSemPar([]);
       const prox = lidas.find((x) => x !== atual && x.l.nf !== cab.numero && !jaCadastrada(x.l.nf));
       setLidas((ls) => ls.filter((x) => x !== atual));
-      setAtual(null);
+      setAtual(null); setPdfAberto(null);
       if (prox) await aplicar(prox);
     } catch (e) { setMsg(`Não foi possível: ${(e as Error).message}`); } finally { setOcupado(false); }
   };
   let secao = '';
   let parteAnt: string | null = null;
   return (
-    <div className={`lancar conteudo ${arrastando ? 'arrastando' : ''}`}
+    <div className={`lancar conteudo ${arrastando ? 'arrastando' : ''} ${mostraPdf ? 'com-pdf' : ''}`}
          onDragOver={(e) => { e.preventDefault(); setArrastando(true); }} onDragLeave={() => setArrastando(false)}
          onDrop={(e) => { e.preventDefault(); setArrastando(false); lerArquivos([...e.dataTransfer.files]); }}>
       {slot && createPortal(
-        <label className={`bt-pdf ${lendo ? 'lendo' : ''}`}>
-          {lendo ? 'Lendo…' : 'Ler PDF'}
-          <input type="file" accept="application/pdf,.pdf" multiple hidden disabled={lendo}
-                 onChange={(e) => { lerArquivos([...(e.target.files ?? [])]); e.target.value = ''; }} />
-        </label>, slot)}
+        <>
+          {atual && <label className="chk"><input type="checkbox" checked={verPdf} onChange={(e) => setVerPdf(e.target.checked)} /> Ver PDF</label>}
+          <label className={`bt-pdf ${lendo ? 'lendo' : ''}`}>
+            {lendo ? 'Lendo…' : 'Ler PDF'}
+            <input type="file" accept="application/pdf,.pdf" multiple hidden disabled={lendo}
+                   onChange={(e) => { lerArquivos([...(e.target.files ?? [])]); e.target.value = ''; }} />
+          </label>
+        </>, slot)}
+      <div className="lancar-esq">
       {lidas.length > 1 && (
         <div className="nfs-lidas">
           {lidas.map((x) => (
@@ -354,6 +369,15 @@ export function LancarNF({ slot }: { slot: HTMLElement | null }) {
             })}</tbody>
           </table>
         </div>
+      )}
+      </div>
+      {mostraPdf && atual && (
+        <aside className="lancar-pdf panel">
+          <div className="pdf-abas">
+            {atual.arquivos.map((a) => <button key={a} className={a === pdfAberto ? 'on' : ''} onClick={() => setPdfAberto(a)}>{a.replace(/\.pdf$/i, '')}</button>)}
+          </div>
+          {pdfAberto && urls.current.get(pdfAberto) && <iframe key={pdfAberto} title={pdfAberto} src={urls.current.get(pdfAberto)} />}
+        </aside>
       )}
       {aviso && <div key={aviso.id} className="aviso-flutuante">{aviso.texto}</div>}
     </div>

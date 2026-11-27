@@ -116,8 +116,8 @@ export const desfazerRecebimento = (nf: number) => chamar<void>('nf_desfazer_rec
 
 // Lançamento pelo PDF: canteiro pelo município do local de entrega; item do controle sugerido para cada linha do romaneio
 export const useCanteiros = () => useTabela<{ nome: string; municipio: string | null }>('canteiro', 'nome, municipio', ['nome']);
-export type Sugestao = { seq: number; material_id: number | null; como: 'volume' | 'fixador' | 'ambiguo' | 'peca' | 'sem' };
-export async function sugerirItens(linha: string, canteiro: string, itens: { seq: number; sku: string; descricao: string; descricao_pa: string; tipo_ud: string }[]) {
+export type Sugestao = { seq: number; material_id: number | null; como: 'volume' | 'peca_controlada' | 'fixador' | 'ambiguo' | 'peca' | 'sem' };
+export async function sugerirItens(linha: string, canteiro: string, itens: { seq: number; sku: string; descricao: string; descricao_pa: string; tipo_ud: string; peso_unit: number }[]) {
   const { data, error } = await supabase.rpc('nf_sugerir_itens', { p_linha: linha, p_canteiro: canteiro, p_itens: itens });
   if (error) throw new Error(error.message);
   return data as Sugestao[];

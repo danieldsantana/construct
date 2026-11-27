@@ -165,7 +165,9 @@ export function lerNF(paginas: Pagina[]): LeituraNF {
     r.romaneio.push(...l.linhas);
     cab = l.cab ?? cab;
   });
+  // só a remessa da própria NF; com romaneios de várias remessas e nenhuma igual, nada (não mistura com outras NFs)
   if (r.remessa && r.romaneio.some((i) => i.remessa === r.remessa)) r.romaneio = r.romaneio.filter((i) => i.remessa === r.remessa);
+  else if (new Set(r.romaneio.map((i) => i.remessa)).size > 1) r.romaneio = [];
   const rod = textos.filter(eRomaneio).join('\n').match(/Peso Total \(Kg\):\s*\n?([\d.]+,\d+)/);
   r.peso_romaneio_rodape = rod ? br(rod[1]) : null;
   return r;
@@ -204,4 +206,23 @@ export function lerNFs(paginas: Pagina[]): LeituraNF[] {
   const roms = textos.map((t, i) => (romaneio(t) ? i : -1)).filter((i) => i >= 0);
   if (grupos.size <= 1) return [lerNF(paginas)];
   return [...grupos.values()].map((ps) => lerNF([...ps, ...roms].map((i) => paginas[i])));
+}
+
+// Vários arquivos de uma vez (como chegam no e-mail: "NF 261733.PDF" + "ROMANEIO 80072537.PDF"): cada NF de qualquer arquivo
+// usa as páginas de romaneio de TODOS os arquivos, filtradas pela remessa do seu DANFE. Arquivo só de romaneio não vira NF.
+export type ArquivoLido = { nome: string; paginas: Pagina[] };
+export type NFLida = { arquivo: string; l: LeituraNF; arquivos: string[] };
+export function lerNFsDeArquivos(arqs: ArquivoLido[]): NFLida[] {
+  const roms: { nome: string; p: Pagina; t: string }[] = [];
+  for (const a of arqs) for (const p of a.paginas) { const t = textoDaPagina(p); if (paginaDeRomaneio(t)) roms.push({ nome: a.nome, p, t }); }
+  const out: NFLida[] = [];
+  for (const a of arqs) {
+    const danfes = a.paginas.filter((p) => !paginaDeRomaneio(textoDaPagina(p)));
+    if (!danfes.length) continue;
+    for (const l of lerNFs([...danfes, ...roms.map((r) => r.p)])) {
+      const deRomaneio = l.remessa ? [...new Set(roms.filter((r) => new RegExp(`(^|\\D)0*${l.remessa}(\\D|$)`).test(r.t)).map((r) => r.nome))] : [];
+      out.push({ arquivo: a.nome, l, arquivos: [a.nome, ...deRomaneio.filter((n) => n !== a.nome)] });
+    }
+  }
+  return out;
 }
