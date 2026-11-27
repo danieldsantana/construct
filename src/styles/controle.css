@@ -477,3 +477,34 @@ body:has(.lancar.conteudo) .notas-tela .titulo .sub { display: none; }
 .fluxo table.receber tr.com-pend td { background: #fff4f2; }
 .fluxo table.receber.pecas { margin-top: 8px; }
 .acoes-nf button.pri.com-pend { background: var(--falta); border-color: var(--falta); }
+
+/* ficha da NF: tabela de recebimento compacta, cabe na gaveta (campos como células) */
+.fluxo table.receber { table-layout: fixed; width: 100%; margin-bottom: 6px; }
+.fluxo table.receber col.c-q { width: 58px; }
+.fluxo table.receber col.c-rnc { width: 86px; }
+.fluxo table.receber col.c-pos { width: 70px; }
+.fluxo table.receber col.c-x { width: 28px; }
+.fluxo table.receber th { font-size: 11.5px; padding: 4px 6px; }
+.fluxo table.receber th.c, .fluxo table.receber td.c { text-align: center; }
+.fluxo table.receber td { padding: 3px 6px; font-size: 13px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.fluxo table.receber td.cel { padding: 0; }
+.fluxo table.receber td.cel input, .fluxo table.receber td.cel select { width: 100%; height: 26px; border: 0; border-radius: 0; background: transparent;
+  text-align: center; font: inherit; font-size: 13px; padding: 0 4px; box-shadow: inset 0 0 0 1px #e3e7ec; }
+.fluxo table.receber td.cel select { text-align: left; }
+.fluxo table.receber td.cel input:focus, .fluxo table.receber td.cel select:focus { outline: none; background: #fff; box-shadow: inset 0 0 0 1.5px var(--navy); }
+.fluxo table.receber tr.com-pend td { background: #fff6f5; }
+.fluxo table.receber td.falta { color: var(--falta); font-weight: 700; }
+.fluxo table.receber button.x { border: 0; background: none; color: var(--muted); font-size: 16px; cursor: pointer; padding: 0; }
+.fluxo table.receber button.x:hover { color: var(--falta); }
+.acoes-nf .rec-campos { display: flex; gap: 12px; flex-wrap: wrap; }
+.acoes-nf .rec-campos label { display: grid; gap: 3px; font-size: 12px; color: var(--muted); }
+.acoes-nf .rec-barra { display: flex; align-items: center; gap: 14px; flex-wrap: wrap; }
+
+/* ficha da NF: mais larga, resumo numa faixa, abas */
+.drawer.larga { width: min(860px, 100%); }
+.drawer.larga .dr-sum { display: grid; grid-template-columns: repeat(auto-fill, minmax(118px, 1fr)); gap: 0; }
+.drawer.larga .dr-sum > div { border-right: 1px solid var(--line-soft); border-bottom: 1px solid var(--line-soft); padding: 6px 10px; }
+.ficha-abas { display: flex; align-items: flex-end; gap: 12px; border-bottom: 2px solid var(--navy); margin-bottom: 10px; }
+.ficha-abas .tabs { border-bottom: 0; margin: 0; }
+.ficha-abas .arquivo { margin-left: auto; font-size: 11.5px; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 45%; padding-bottom: 4px; }
+.fluxo .acoes-nf { position: sticky; bottom: -1px; background: var(--panel); padding-bottom: 8px; z-index: 1; }

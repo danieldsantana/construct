@@ -1,7 +1,7 @@
 import { useEffect, type ReactNode } from 'react';
 
 // Ficha lateral: abre por cima da lista, sem perder o lugar. Esc fecha.
-export function Gaveta({ aberta, aoFechar, sub, titulo, resumo, children, acoes }: {
+export function Gaveta({ aberta, aoFechar, sub, titulo, resumo, children, acoes, larga }: {
   aberta: boolean;
   aoFechar: () => void;
   sub: string;
@@ -9,6 +9,7 @@ export function Gaveta({ aberta, aoFechar, sub, titulo, resumo, children, acoes 
   resumo?: [string, ReactNode][];
   children: ReactNode;
   acoes?: ReactNode;
+  larga?: boolean;
 }) {
   useEffect(() => {
     if (!aberta) return;
@@ -17,7 +18,7 @@ export function Gaveta({ aberta, aoFechar, sub, titulo, resumo, children, acoes 
     return () => window.removeEventListener('keydown', tecla);
   }, [aberta, aoFechar]);
   return (
-    <aside className={`drawer ${aberta ? 'on' : ''}`} aria-hidden={!aberta} aria-label="Ficha">
+    <aside className={`drawer ${aberta ? 'on' : ''} ${larga ? 'larga' : ''}`} aria-hidden={!aberta} aria-label="Ficha">
       {aberta && (
         <>
           <div className="dr-h">

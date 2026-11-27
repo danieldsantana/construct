@@ -4,12 +4,12 @@ import { useSearchParams } from 'react-router';
 import { Abas, Titulo } from '../componentes/Titulo';
 import { Gaveta } from '../componentes/Gaveta';
 import { FiltroColuna } from '../componentes/FiltroColuna';
-import { AcoesNF } from './NotasFluxo';
+import { AcoesNF, PendenciasNF } from './NotasFluxo';
 import { ResumoSelecao, useTabelaCruz } from '../componentes/TabelaCruz';
 import { useEscopo } from '../lib/escopo';
 import { colunaDaOrigem, data, num } from '../lib/formato';
 import {
-  useConferenciaNF, useLancamentos, useLeituraRomaneio, useNotasFiscais, useRecebimentos, useSaldos,
+  useConferenciaNF, useLancamentos, useLeituraRomaneio, useNFItens, useNotasFiscais, usePendencias, useRecebimentos, useSaldos,
   type NotaFiscal, type Recebimento, type SituacaoNF,
 } from '../dados/recebimento';
 
@@ -358,32 +358,39 @@ function ItensDosMovimentos({ movimentos }: { movimentos: Recebimento[] }) {
   );
 }
 
+type AbaNF = 'itens' | 'remessa' | 'pendencias';
 function FichaNF({ nf, recebimentos, aoFechar }: { nf: NotaFiscal | null; recebimentos: Recebimento[]; aoFechar: () => void }) {
   const movs = useMemo(() => (nf ? recebimentos.filter((r) => r.nf_id === nf.id) : []), [nf, recebimentos]);
+  const nfItens = useNFItens();
+  const pend = usePendencias();
+  const [aba, setAba] = useState<AbaNF>('itens');
+  useEffect(() => { setAba('itens'); }, [nf?.id]);
   const s = nf ? SITUACAO[nf.situacao_exibida] : null;
+  const temItensNF = !!nf && nfItens.dados.some((i) => i.nota_fiscal_id === nf.id);
+  const nPend = nf ? pend.dados.filter((p) => p.nota_fiscal_id === nf.id).length : 0;
+  const fora = !!nf?.destino && !!nf?.canteiro_recebimento && nf.destino !== nf.canteiro_recebimento;
   return (
-    <Gaveta aberta={!!nf} aoFechar={aoFechar} sub={nf ? `Nota fiscal · ${nf.linha ?? 'linha não definida'}` : ''} titulo={nf ? `NF ${nf.numero}` : ''}
-            resumo={nf ? [['Situação', <span className={`st ${s![1]}`}>{s![0]}</span>], ['OF', nf.of_texto ?? '—'], ['Peso', nf.peso ? `${num(nf.peso, 1)} kg` : '—'], ['Itens', nf.itens || '—']] : []}>
+    <Gaveta larga aberta={!!nf} aoFechar={aoFechar} sub={nf ? ['Nota fiscal', nf.linha].filter(Boolean).join(' · ') : ''} titulo={nf ? `NF ${nf.numero}` : ''}
+            resumo={nf ? [
+              ['Situação', <span className={`st ${s![1]}`}>{s![0]}</span>],
+              ['Emissão', data(nf.emissao) || '—'],
+              ['Recebida', nf.recebida_em ? <>{data(nf.recebida_em)} · <span className={fora ? 'warn' : ''}>{nf.canteiro_recebimento}</span></> : '—'],
+              ['Destino', nf.destino ?? '—'],
+              ['OF', nf.of_texto ? nf.of_texto.replace(/^OF-\d+-EM-BRM-/, 'OF-') : '—'],
+              ['Remessa', nf.romaneio ?? '—'],
+              ['Valor', nf.valor ? `R$ ${num(nf.valor, 2)}` : '—'],
+              ['Peso', nf.peso ? `${num(nf.peso, 1)} kg` : '—'],
+              ...(nf.sac || nf.rnc ? [['SAC / RNC', [nf.sac && `SAC ${nf.sac}`, nf.rnc && `RNC ${nf.rnc}`].filter(Boolean).join(' · ')] as [string, ReactNode]] : []),
+            ] : []}>
       {nf && (
         <>
-          <div className="passos">
-            <div className="feito"><b>Emitida</b><span className="muted">{data(nf.emissao)}</span></div>
-            <div className={nf.recebida_em ? 'feito' : 'atual'}><b>Recebida</b><span className="muted">{nf.recebida_em ? `${data(nf.recebida_em)} · ${nf.canteiro_recebimento}` : '—'}</span></div>
+          <div className="ficha-abas">
+            <Abas<AbaNF> abas={[['itens', `Itens (${nf.itens || 0})`], ['remessa', 'Remessa × lançado'], ['pendencias', `Pendências (${nPend})`]]} atual={aba} aoMudar={setAba} />
+            {nf.arquivo && <span className="arquivo" title={nf.arquivo}>{nf.arquivo}</span>}
           </div>
-          {nf.situacao_exibida === 'nao_recebida' && <div className="callout">Emitida há {dias(nf.emissao)} dias e ainda não recebida em {nf.destino ?? 'destino não informado'}.</div>}
-          {nf.situacao_exibida === 'sem_controle' && <div className="callout">{SITUACAO.sem_controle[2]}</div>}
-          {nf.destino && nf.canteiro_recebimento && nf.destino !== nf.canteiro_recebimento && <div className="callout">Destino na NF: {nf.destino}. Recebida em {nf.canteiro_recebimento}.</div>}
-          <div className="fields">
-            <div><span>Destino (NF)</span><b>{nf.destino ?? '—'}</b></div>
-            <div><span>Remessa</span><b>{nf.romaneio ?? '—'}</b></div>
-            <div><span>Valor</span><b>{nf.valor ? `R$ ${num(nf.valor, 2)}` : '—'}</b></div>
-            <div><span>SAC / RNC</span><b>{[nf.sac && `SAC ${nf.sac}`, nf.rnc && `RNC ${nf.rnc}`].filter(Boolean).join(' · ') || '—'}</b></div>
-            <div style={{ gridColumn: '1 / -1' }}><span>Arquivo</span><b style={{ fontSize: 13 }}>{nf.arquivo ?? 'sem PDF no índice'}</b></div>
-          </div>
-          <AcoesNF nf={nf} />
-          <RomaneioXLancado nfId={nf.id} recebida={!!nf.recebida_em} />
-          <h2>Itens recebidos</h2>
-          <ItensDosMovimentos movimentos={movs} />
+          {aba === 'itens' && (temItensNF ? <AcoesNF nf={nf} /> : <ItensDosMovimentos movimentos={movs} />)}
+          {aba === 'remessa' && <RomaneioXLancado nfId={nf.id} recebida={!!nf.recebida_em} />}
+          {aba === 'pendencias' && <PendenciasNF nf={nf} />}
         </>
       )}
     </Gaveta>
@@ -418,7 +425,6 @@ function RomaneioXLancado({ nfId, recebida }: { nfId: number; recebida: boolean 
   const difs = linhas.filter((c) => Number(c.qtd_romaneio) !== Number(c.qtd_lancada));
   return (
     <>
-      <h2>Remessa × lançado</h2>
       {!recebida
         ? <p className="muted" style={{ fontSize: 13 }}>Remessa lida e conferida com o peso{l.peso_danfe ? ` do DANFE (${num(l.peso_danfe, 1)} kg)` : ''}; a NF ainda não foi lançada.</p>
         : <div className={difs.length ? 'callout' : 'notes'}>{difs.length ? `${difs.length} volume(s) com diferença entre a remessa e o lançado.` : 'Lançado igual à remessa em todos os volumes.'}</div>}
