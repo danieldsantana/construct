@@ -420,13 +420,13 @@ body:has(.lancar.conteudo) .scopebar button.on { background: transparent; color:
 .lancar-grade.planilha input.qtd { width: 72px; padding: 0 4px; height: 20px; font-size: 12.5px; text-align: center; }
 .lancar-grade.planilha td { padding: 1px 6px; }
 /* notificação flutuante: aparece e some sozinha */
-.aviso-flutuante { position: fixed; right: 24px; bottom: 24px; z-index: 60; background: var(--navy); color: #fff; padding: 10px 18px; font-size: 14px;
-  font-weight: 600; box-shadow: 0 8px 24px rgba(0,0,0,.2); border-left: 4px solid var(--orange); animation: aviso 3.6s ease forwards; pointer-events: none; }
+.aviso-flutuante { position: fixed; left: 50%; top: 18px; z-index: 60; background: var(--ok); color: #fff; padding: 10px 22px; font-size: 14px;
+  font-weight: 600; box-shadow: 0 8px 24px rgba(0,0,0,.2); animation: aviso 3.6s ease forwards; pointer-events: none; }
 @keyframes aviso {
-  0% { opacity: 0; transform: translateY(12px); }
-  10% { opacity: 1; transform: translateY(0); }
-  80% { opacity: 1; transform: translateY(0); }
-  100% { opacity: 0; transform: translateY(8px); }
+  0% { opacity: 0; transform: translate(-50%, -12px); }
+  10% { opacity: 1; transform: translate(-50%, 0); }
+  80% { opacity: 1; transform: translate(-50%, 0); }
+  100% { opacity: 0; transform: translate(-50%, -8px); }
 }
 
 /* Lançar NF: coluna de lançamento como a da planilha (sem caixa laranja); campo parece célula */
