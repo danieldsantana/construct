@@ -1,8 +1,9 @@
-import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useMemo, useState, type ReactNode } from 'react';
 import { useSearchParams } from 'react-router';
 import { Abas, Titulo } from '../componentes/Titulo';
 import { Gaveta } from '../componentes/Gaveta';
 import { AcoesNF, LancarNF } from './NotasFluxo';
+import { ResumoSelecao, useTabelaCruz } from '../componentes/TabelaCruz';
 import { useEditor } from '../lib/sessao';
 import { useEscopo } from '../lib/escopo';
 import { colunaDaOrigem, data, num } from '../lib/formato';
@@ -169,7 +170,8 @@ function PlanilhaEntrada({ pares, recebimentos, aoAbrir, aoAbrirNF }: {
   const saldos = useSaldos();
   const lanc = useLancamentos();
   const [todas, setTodas] = useState(false);
-  const tabRef = useRef<HTMLTableElement>(null);
+  const cruz = useTabelaCruz();  // cruz do mouse + seleção (clique, arrastar, Ctrl), como no Estoque
+  const tabRef = cruz.ref;
   const varios = pares.length > 1;
   // congela como no Excel: as linhas do cabeçalho presas no topo e as 3 primeiras colunas presas à esquerda
   useLayoutEffect(() => {
@@ -208,10 +210,10 @@ function PlanilhaEntrada({ pares, recebimentos, aoAbrir, aoAbrirNF }: {
     return m;
   }, [lanc.dados, colunas]);
   const itens = useMemo(() => {
-    const m = new Map<number, { material_id: number; secao: string; descricao: string; unidade: string; ordem: number; previsto: number; recebido: number }>();
+    const m = new Map<number, { material_id: number; secao: string; descricao: string; parte: string | null; unidade: string; ordem: number; previsto: number; recebido: number }>();
     for (const s of saldos.dados) {
       if (pos(s.linha, s.canteiro) < 0 || (Number(s.previsto) === 0 && Number(s.recebido) === 0)) continue;
-      const a = m.get(s.material_id) ?? { material_id: s.material_id, secao: s.secao, descricao: s.descricao, unidade: s.unidade, ordem: s.ordem, previsto: 0, recebido: 0 };
+      const a = m.get(s.material_id) ?? { material_id: s.material_id, secao: s.secao, descricao: s.descricao, parte: s.parte, unidade: s.unidade, ordem: s.ordem, previsto: 0, recebido: 0 };
       a.previsto += Number(s.previsto); a.recebido += Number(s.recebido);
       m.set(s.material_id, a);
     }
@@ -232,14 +234,16 @@ function PlanilhaEntrada({ pares, recebimentos, aoAbrir, aoAbrirNF }: {
     ['Romaneio', (c) => c.romaneio ?? ''],
   ];
   let secao = '';
+  let parteAnt: string | null = null;
   return (
     <>
       <div className="toolbar">
         <span className="muted">{mostrar.length} de {colunas.length} colunas, na ordem do controle{varios ? ', canteiro a canteiro' : ''} · só itens com previsto ou recebimento</span>
+        <span className="grow" /><ResumoSelecao refSpan={cruz.resumoRef} />
         <button onClick={() => setTodas(!todas)}>{todas ? 'Só as 25 últimas' : 'Todas as colunas'}</button>
       </div>
       <div className="panel planilha" style={{ overflow: 'auto', maxHeight: 'calc(100vh - 300px)' }}>
-        <table ref={tabRef}>
+        <table ref={tabRef} className="cruz" onMouseDown={cruz.onMouseDown} onMouseOver={cruz.onMouseOver} onMouseLeave={cruz.onMouseLeave}>
           <thead>
             {cab.map(([rot, f], i) => (
               <tr key={rot} className={`cab ${rot === 'Canteiro' ? 'cab-cant' : ''}`}>
@@ -260,11 +264,14 @@ function PlanilhaEntrada({ pares, recebimentos, aoAbrir, aoAbrirNF }: {
               const out = [];
               if (s.secao !== secao) {
                 secao = s.secao;
-                out.push(<tr key={`s${s.material_id}`} className="sec"><td>{s.secao}</td><td /><td />{mostrar.length > 0 && <td colSpan={mostrar.length} />}</tr>);
+                parteAnt = null;
+                out.push(<tr key={`s${s.material_id}`} className="sec faixa"><td>{s.secao}</td><td /><td />{mostrar.length > 0 && <td colSpan={mostrar.length} />}</tr>);
               }
               const falta = s.recebido < s.previsto;
+              const iniParte = parteAnt !== null && s.parte !== parteAnt;  // linha mais escura entre componentes
+              parteAnt = s.parte;
               out.push(
-                <tr key={s.material_id}>
+                <tr key={s.material_id} data-k={s.material_id} className={iniParte ? 'ini-parte' : ''}>
                   <td className="desc">{s.descricao}</td>
                   <td className="r num prev">{num(s.previsto)}</td>
                   <td className={`r num rec ${falta ? 'warn' : ''}`}>{num(s.recebido)}</td>
