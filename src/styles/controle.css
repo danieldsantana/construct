@@ -523,3 +523,9 @@ body:has(.lancar.conteudo) .notas-tela .titulo .sub { display: none; }
 .drawer.larga .dr-sum > div { padding: 4px 10px; display: grid; gap: 1px; }
 .drawer.larga .dr-sum > div > span { font-size: 11px; }
 .drawer.larga .dr-sum > div > b { font-size: 13.5px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+/* filtro de coluna: classificar */
+.fc-pop .fc-ordem { display: grid; gap: 2px; border-bottom: 1px solid var(--line-soft); padding-bottom: 6px; }
+.fc-pop .fc-ordem button { text-align: left; border: 0; background: transparent; padding: 3px 6px; font: inherit; font-size: 13px; cursor: pointer; color: var(--ink); }
+.fc-pop .fc-ordem button:hover { background: var(--line-soft); }
+.fc-pop .fc-ordem button.on { background: var(--navy-tint); color: var(--navy); font-weight: 700; }

@@ -95,8 +95,10 @@ export function AcoesNF({ nf }: { nf: NotaFiscal }) {
                   {editavel && <>
                     <td className="cel"><input inputMode="numeric" value={chegou[i.material_id] ?? String(q)}
                       onChange={(e) => setChegou({ ...chegou, [i.material_id]: e.target.value.replace(/[^\d.,]/g, '').replace(',', '.') })} /></td>
-                    <td className="c num falta">{falta > 0 ? num(falta) : ''}</td>
-                    <td className="cel">{falta > 0 && <input value={rnc[i.material_id] ?? ''} onChange={(e) => setRnc({ ...rnc, [i.material_id]: e.target.value })} />}</td>
+                    <td className={`c num ${falta > 0 ? 'falta' : 'muted'}`}>{falta > 0 ? num(falta) : '-'}</td>
+                    {falta > 0
+                      ? <td className="cel"><input value={rnc[i.material_id] ?? ''} onChange={(e) => setRnc({ ...rnc, [i.material_id]: e.target.value })} /></td>
+                      : <td className="c muted">-</td>}
                   </>}
                 </tr>
               );

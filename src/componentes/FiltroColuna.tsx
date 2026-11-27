@@ -2,9 +2,10 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 
 // Filtro de coluna no estilo do autofiltro do Excel: ▾ no título; lista dos valores da coluna com caixas de marcação,
 // busca e "Selecionar tudo". selecionados = null significa sem filtro (todos).
-export function FiltroColuna({ titulo, valores, selecionados, aoMudar, ordem }: {
+export function FiltroColuna({ titulo, valores, selecionados, aoMudar, ordem, ordenacao, aoOrdenar }: {
   titulo: string; valores: string[]; selecionados: Set<string> | null; aoMudar: (s: Set<string> | null) => void;
   ordem?: (a: string, b: string) => number;
+  ordenacao?: 'asc' | 'desc' | null; aoOrdenar?: (d: 'asc' | 'desc' | null) => void;
 }) {
   const [aberto, setAberto] = useState(false);
   const [busca, setBusca] = useState('');
@@ -32,10 +33,16 @@ export function FiltroColuna({ titulo, valores, selecionados, aoMudar, ordem }: 
   const todosVis = vis.every(([v]) => marcado(v));
   return (
     <span className="filtro-col" ref={ref}>
-      {titulo}
+      {titulo}{ordenacao === 'asc' ? ' ↑' : ordenacao === 'desc' ? ' ↓' : ''}
       <button className={`fc-bt ${selecionados ? 'ativo' : ''}`} onClick={(e) => { e.stopPropagation(); setAberto(!aberto); }} aria-label={`Filtrar ${titulo}`}>▾</button>
       {aberto && (
         <div className="fc-pop" onClick={(e) => e.stopPropagation()}>
+          {aoOrdenar && (
+            <div className="fc-ordem">
+              <button className={ordenacao === 'asc' ? 'on' : ''} onClick={() => aoOrdenar(ordenacao === 'asc' ? null : 'asc')}>↑ Crescente</button>
+              <button className={ordenacao === 'desc' ? 'on' : ''} onClick={() => aoOrdenar(ordenacao === 'desc' ? null : 'desc')}>↓ Decrescente</button>
+            </div>
+          )}
           <input autoFocus placeholder="Buscar" value={busca} onChange={(e) => {
             const b = e.target.value;
             setBusca(b);

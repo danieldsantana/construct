@@ -104,14 +104,25 @@ export function Notas() {
   const doChip = useMemo(() => linhas.filter((l) => passa(l, filtro)),
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [linhas, filtro]);
+  // ordem padrão: em conferência, emitidas, recebidas, outras (reposição, sem controle, transferências, ajustes); mais recente primeiro
+  const grupo = (l: Linha) => (l.k !== 'nf' ? 3 : ({ em_conferencia: 0, nao_recebida: 1, confirmada: 2 } as Record<string, number>)[l.nf.situacao_exibida] ?? 3);
+  const [ordenar, setOrdenar] = useState<{ c: Col; d: 'asc' | 'desc' } | null>(null);
   const visiveis = useMemo(() => doChip
     .filter((l) => (Object.entries(filtrosCol) as [Col, Set<string> | null][]).every(([c, sel]) => !sel || sel.has(valorCol(l, c))))
-    .sort((a, b) => b.quando.localeCompare(a.quando)),
+    .sort((a, b) => {
+      if (ordenar) {
+        const [x, y] = [valorCol(a, ordenar.c), valorCol(b, ordenar.c)];
+        const v = (ordenar.c === 'emissao' || ordenar.c === 'recebida') ? ordemData(x, y) : x.localeCompare(y, 'pt-BR', { numeric: true });
+        if (v) return ordenar.d === 'asc' ? v : -v;
+      }
+      return grupo(a) - grupo(b) || b.quando.localeCompare(a.quando);
+    }),
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [doChip, filtrosCol]);
+    [doChip, filtrosCol, ordenar]);
   const fc = (c: Col, titulo: string, ordem?: (a: string, b: string) => number) => (
     <FiltroColuna titulo={titulo} valores={doChip.map((l) => valorCol(l, c))} selecionados={filtrosCol[c] ?? null} ordem={ordem}
-                  aoMudar={(sel) => setFiltrosCol((f) => ({ ...f, [c]: sel }))} />
+                  aoMudar={(sel) => setFiltrosCol((f) => ({ ...f, [c]: sel }))}
+                  ordenacao={ordenar?.c === c ? ordenar.d : null} aoOrdenar={(d) => setOrdenar(d ? { c, d } : null)} />
   );
 
   const carregando = nfs.carregando || rec.carregando;
