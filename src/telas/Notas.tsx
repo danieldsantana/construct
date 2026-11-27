@@ -104,8 +104,8 @@ export function Notas() {
   const doChip = useMemo(() => linhas.filter((l) => passa(l, filtro)),
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [linhas, filtro]);
-  // ordem padrão: em conferência, emitidas, recebidas, outras (reposição, sem controle, transferências, ajustes); mais recente primeiro
-  const grupo = (l: Linha) => (l.k !== 'nf' ? 3 : ({ em_conferencia: 0, nao_recebida: 1, confirmada: 2 } as Record<string, number>)[l.nf.situacao_exibida] ?? 3);
+  // ordem padrão: situação (emitidas, em conferência, recebidas, outras) e, dentro dela, a NF mais recente (maior número) primeiro
+  const grupo = (l: Linha) => (l.k !== 'nf' ? 3 : ({ nao_recebida: 0, em_conferencia: 1, confirmada: 2 } as Record<string, number>)[l.nf.situacao_exibida] ?? 3);
   const [ordenar, setOrdenar] = useState<{ c: Col; d: 'asc' | 'desc' } | null>(null);
   const visiveis = useMemo(() => doChip
     .filter((l) => (Object.entries(filtrosCol) as [Col, Set<string> | null][]).every(([c, sel]) => !sel || sel.has(valorCol(l, c))))
@@ -115,7 +115,7 @@ export function Notas() {
         const v = (ordenar.c === 'emissao' || ordenar.c === 'recebida') ? ordemData(x, y) : x.localeCompare(y, 'pt-BR', { numeric: true });
         if (v) return ordenar.d === 'asc' ? v : -v;
       }
-      return grupo(a) - grupo(b) || b.quando.localeCompare(a.quando);
+      return grupo(a) - grupo(b) || valorCol(b, 'nf').localeCompare(valorCol(a, 'nf'), 'pt-BR', { numeric: true });
     }),
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [doChip, filtrosCol, ordenar]);
