@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { useEditor } from '../lib/sessao';
 import { data, num } from '../lib/formato';
 import {
-  confirmarNF, desfazerRecebimento, marcarRecebida, salvarNF, sugerirItens, useCanteiros, useLancamentos, useNFItens, useNotasFiscais, usePendencias,
+  confirmarNF, desfazerRecebimento, receberNF, salvarNF, sugerirItens, useCanteiros, useLancamentos, useNFItens, useNotasFiscais, usePendencias,
   useRecebimentos, useSaldos,
   type NotaFiscal, type PendenciaNova,
 } from '../dados/recebimento';
@@ -19,7 +19,10 @@ const hoje = () => new Date().toISOString().slice(0, 10);
 const n = (v: number | string | null | undefined) => Number(v ?? 0);
 const TIPOS: [PendenciaNova['tipo'], string][] = [['volume', 'Volume'], ['peca', 'Peça'], ['fixador', 'Fixador']];
 
-// ---------- Ações na ficha da NF: emitida → recebida (em conferência) → confirmada (com ou sem pendências) ----------
+// ---------- Ações na ficha da NF: emitida → recebida (sem ou com pendências) ----------
+// Recebimento em um passo: para cada item da NF, quanto chegou em condições; a diferença vira pendência (falta ou avaria,
+// RNC opcional) e fica fora do estoque até a reposição. Peça faltante de um volume: linha própria (volume fica incompleto).
+type PecaFalta = { material_id: number | null; descricao: string; quantidade: number; motivo: 'falta' | 'avaria'; rnc: string };
 export function AcoesNF({ nf }: { nf: NotaFiscal }) {
   const editor = useEditor();
   const itens = useNFItens();
@@ -31,28 +34,82 @@ export function AcoesNF({ nf }: { nf: NotaFiscal }) {
   const [ocupado, setOcupado] = useState(false);
   const [dataRec, setDataRec] = useState(hoje());
   const [canteiro, setCanteiro] = useState(nf.destino ?? '');
-  const [comPend, setComPend] = useState(false);
-  const [linhas, setLinhas] = useState<PendenciaNova[]>([{ tipo: 'volume', material_id: null, quantidade: 1, motivo: 'falta' }]);
+  const [chegou, setChegou] = useState<Record<number, string>>({});
+  const [motivo, setMotivo] = useState<Record<number, 'falta' | 'avaria'>>({});
+  const [rnc, setRnc] = useState<Record<number, string>>({});
+  const [pecas, setPecas] = useState<PecaFalta[]>([]);
   const canteiros = useMemo(() => [...new Set(saldos.dados.map((s) => s.canteiro))].sort(), [saldos.dados]);
-  // itens da NF para escolher na pendência (o fluxo de conferência é das NFs lançadas no app, que têm itens)
-  const recebidos = useMemo(() => meus.map((i) => [i.material_id, i.descricao] as [number, string]), [meus]);
+  const aReceber = nf.situacao_exibida !== 'confirmada' && nf.situacao_exibida !== 'em_conferencia';
+  const emConferencia = nf.situacao_exibida === 'em_conferencia';
+
+  const qChegou = (id: number, nfQ: number) => (chegou[id] === undefined || chegou[id] === '' ? nfQ : n(chegou[id]));
+  const novas: PendenciaNova[] = [
+    ...meus.flatMap((i) => {
+      const falta = n(i.quantidade) - qChegou(i.material_id, n(i.quantidade));
+      return falta > 0 ? [{ tipo: (i.secao.startsWith('FIXADORES') ? 'fixador' : 'volume') as PendenciaNova['tipo'], material_id: i.material_id,
+        quantidade: falta, motivo: motivo[i.material_id] ?? 'falta', rnc: rnc[i.material_id] }] : [];
+    }),
+    ...pecas.filter((x) => x.material_id && x.quantidade > 0).map((x) => ({ tipo: 'peca' as const, material_id: x.material_id, descricao: x.descricao,
+      quantidade: x.quantidade, motivo: x.motivo, rnc: x.rnc })),
+  ];
+  const invalido = meus.some((i) => { const c = qChegou(i.material_id, n(i.quantidade)); return c < 0 || c > n(i.quantidade); })
+    || pecas.some((x) => !x.material_id || !(x.quantidade > 0));
 
   const fazer = async (f: () => Promise<unknown>, ok: string) => {
     setOcupado(true); setMsg(null);
-    try { await f(); setMsg(ok); } catch (e) { setMsg(`Não foi possível: ${(e as Error).message}`); } finally { setOcupado(false); }
+    try { await f(); setMsg(ok); setChegou({}); setMotivo({}); setRnc({}); setPecas([]); }
+    catch (e) { setMsg(`Não foi possível: ${(e as Error).message}`); } finally { setOcupado(false); }
   };
+  const registrar = () => (aReceber
+    ? fazer(() => receberNF(nf.id, dataRec, canteiro, nf.linha, novas), novas.length ? `Recebida com ${novas.length} pendência(s)` : 'Recebida')
+    : fazer(() => confirmarNF(nf.id, novas), novas.length ? `Confirmada com ${novas.length} pendência(s)` : 'Confirmada'));
+  const editavel = editor && (aReceber || emConferencia) && meus.length > 0;
 
   return (
     <section className="fluxo">
       {meus.length > 0 && (
         <>
           <h2>Itens da NF {nf.lancamento ? `(lançados ${nf.lancamento === 'pdf' ? 'pelo PDF' : 'manualmente'})` : ''}</h2>
-          <table>
-            <thead><tr><th>Item</th><th className="r">Qtd.</th><th className="r">Peso (kg)</th></tr></thead>
-            <tbody>{meus.map((i) => (
-              <tr key={i.material_id}><td>{i.descricao}</td><td className="r num">{num(i.quantidade)}</td><td className="r num">{i.peso_unit ? num(n(i.quantidade) * n(i.peso_unit), 1) : '—'}</td></tr>
-            ))}</tbody>
+          <table className="receber">
+            <thead><tr><th>Item</th><th className="r">NF</th>{editavel && <><th className="r">Chegou</th><th className="r">Pendência</th><th>Motivo</th><th>RNC</th></>}</tr></thead>
+            <tbody>{meus.map((i) => {
+              const q = n(i.quantidade);
+              const c = qChegou(i.material_id, q);
+              const falta = q - c;
+              return (
+                <tr key={i.material_id} className={falta > 0 ? 'com-pend' : ''}>
+                  <td>{i.descricao}</td><td className="r num">{num(q)}</td>
+                  {editavel && <>
+                    <td className="r"><input className="qtd" inputMode="numeric" value={chegou[i.material_id] ?? String(q)}
+                      onChange={(e) => setChegou({ ...chegou, [i.material_id]: e.target.value.replace(/[^\d.,]/g, '').replace(',', '.') })} /></td>
+                    <td className={`r num ${falta > 0 ? 'warn' : ''}`}>{falta > 0 ? num(falta) : ''}</td>
+                    <td>{falta > 0 && <select value={motivo[i.material_id] ?? 'falta'} onChange={(e) => setMotivo({ ...motivo, [i.material_id]: e.target.value as 'falta' | 'avaria' })}>
+                      <option value="falta">falta</option><option value="avaria">avaria</option></select>}</td>
+                    <td>{falta > 0 && <input className="rnc" value={rnc[i.material_id] ?? ''} onChange={(e) => setRnc({ ...rnc, [i.material_id]: e.target.value })} />}</td>
+                  </>}
+                </tr>
+              );
+            })}</tbody>
           </table>
+          {editavel && pecas.length > 0 && (
+            <table className="receber pecas">
+              <thead><tr><th>Volume</th><th>Peça</th><th className="r">Qtd.</th><th>Motivo</th><th>RNC</th><th /></tr></thead>
+              <tbody>{pecas.map((x, k) => {
+                const muda = (y: Partial<PecaFalta>) => setPecas((ps) => ps.map((z, j) => (j === k ? { ...z, ...y } : z)));
+                return (
+                  <tr key={k}>
+                    <td><select value={x.material_id ?? ''} onChange={(e) => muda({ material_id: e.target.value ? Number(e.target.value) : null })}>
+                      <option value="">—</option>{meus.filter((i) => !i.secao.startsWith('FIXADORES')).map((i) => <option key={i.material_id} value={i.material_id}>{i.descricao}</option>)}</select></td>
+                    <td><input value={x.descricao} placeholder="POS" onChange={(e) => muda({ descricao: e.target.value })} /></td>
+                    <td className="r"><input className="qtd" inputMode="numeric" value={x.quantidade} onChange={(e) => muda({ quantidade: Number(e.target.value.replace(/\D/g, '')) })} /></td>
+                    <td><select value={x.motivo} onChange={(e) => muda({ motivo: e.target.value as 'falta' | 'avaria' })}><option value="falta">falta</option><option value="avaria">avaria</option></select></td>
+                    <td><input className="rnc" value={x.rnc} onChange={(e) => muda({ rnc: e.target.value })} /></td>
+                    <td><button className="link" onClick={() => setPecas((ps) => ps.filter((_, j) => j !== k))}>remover</button></td>
+                  </tr>
+                );
+              })}</tbody>
+            </table>
+          )}
         </>
       )}
 
@@ -63,7 +120,7 @@ export function AcoesNF({ nf }: { nf: NotaFiscal }) {
             <thead><tr><th>Tipo</th><th>Item</th><th className="r">Qtd.</th><th>Motivo</th><th>RNC / SAC</th><th>Situação</th></tr></thead>
             <tbody>{pendencias.map((p) => (
               <tr key={p.id}><td>{TIPOS.find(([k]) => k === p.tipo)?.[1]}</td><td>{p.material ?? '—'}{p.descricao ? <span className="muted"> · {p.descricao}</span> : ''}</td>
-                <td className="r num">{num(p.quantidade)}</td><td>{p.motivo}</td><td>{[p.rnc && `RNC ${p.rnc}`, p.sac && `SAC ${p.sac}`].filter(Boolean).join(' · ') || <span className="muted">a preencher</span>}</td>
+                <td className="r num">{num(p.quantidade)}</td><td>{p.motivo}</td><td>{[p.rnc && `RNC ${p.rnc}`, p.sac && `SAC ${p.sac}`].filter(Boolean).join(' · ') || '—'}</td>
                 <td>{p.situacao}</td></tr>
             ))}</tbody>
           </table>
@@ -72,56 +129,26 @@ export function AcoesNF({ nf }: { nf: NotaFiscal }) {
 
       {editor && (
         <div className="acoes-nf">
-          {nf.situacao_exibida !== 'confirmada' && nf.situacao_exibida !== 'em_conferencia' && (
-            meus.length === 0
-              ? <p className="muted">Sem itens lançados.</p>
-              : (
-                <div className="linha-acao">
-                  <b>Pátio informou o recebimento?</b>
-                  <label>Data <input type="date" value={dataRec} onChange={(e) => setDataRec(e.target.value)} /></label>
-                  <label>Canteiro <select value={canteiro} onChange={(e) => setCanteiro(e.target.value)}>
-                    <option value="">—</option>{canteiros.map((c) => <option key={c}>{c}</option>)}</select></label>
-                  <button className="pri" disabled={ocupado || !canteiro || !dataRec}
-                          onClick={() => fazer(() => marcarRecebida(nf.id, dataRec, canteiro, nf.linha ?? undefined), 'Marcada como recebida: em conferência.')}>Marcar como recebida</button>
-                </div>
-              )
+          {aReceber && meus.length === 0 && <p className="muted">Sem itens lançados.</p>}
+          {editavel && (
+            <div className="linha-acao">
+              {aReceber && <>
+                <label>Data <input type="date" value={dataRec} onChange={(e) => setDataRec(e.target.value)} /></label>
+                <label>Canteiro <select value={canteiro} onChange={(e) => setCanteiro(e.target.value)}>
+                  <option value="">—</option>{canteiros.map((c) => <option key={c}>{c}</option>)}</select></label>
+              </>}
+              <button onClick={() => setPecas((ps) => [...ps, { material_id: null, descricao: '', quantidade: 1, motivo: 'falta', rnc: '' }])}>+ peça faltante</button>
+              <span className="grow" />
+              <button className={novas.length ? 'pri com-pend' : 'pri'} disabled={ocupado || invalido || (aReceber && (!canteiro || !dataRec))} onClick={registrar}>
+                {aReceber ? (novas.length ? `Recebida com ${novas.length} pendência(s)` : 'Recebida sem pendências')
+                  : (novas.length ? `Confirmar com ${novas.length} pendência(s)` : 'Confirmar sem pendências')}
+              </button>
+            </div>
           )}
-          {nf.situacao_exibida === 'em_conferencia' && (
-            <>
-              <div className="linha-acao">
-                <b>Conferência</b>
-                <button className="pri" disabled={ocupado} onClick={() => fazer(() => confirmarNF(nf.id), 'Confirmada: entrou no estoque.')}>Confirmar (tudo certo)</button>
-                <button disabled={ocupado} onClick={() => setComPend((v) => !v)}>{comPend ? 'Cancelar pendência' : 'Confirmar com pendência'}</button>
-                {nf.lancamento && <button className="link" disabled={ocupado} onClick={() => fazer(() => desfazerRecebimento(nf.id), 'Recebimento desfeito: voltou para emitida.')}>Desfazer recebimento</button>}
-              </div>
-              {comPend && (
-                <div className="pend-form">
-                  <table>
-                    <thead><tr><th>Tipo</th><th>Item da NF</th><th>Peça / descrição</th><th className="r">Qtd.</th><th>Motivo</th><th>Observação</th><th /></tr></thead>
-                    <tbody>{linhas.map((l, i) => {
-                      const muda = (x: Partial<PendenciaNova>) => setLinhas((ls) => ls.map((y, j) => (j === i ? { ...y, ...x } : y)));
-                      return (
-                        <tr key={i}>
-                          <td><select value={l.tipo} onChange={(e) => muda({ tipo: e.target.value as PendenciaNova['tipo'] })}>{TIPOS.map(([k, t]) => <option key={k} value={k}>{t}</option>)}</select></td>
-                          <td><select value={l.material_id ?? ''} onChange={(e) => muda({ material_id: e.target.value ? Number(e.target.value) : null })}>
-                            <option value="">—</option>{recebidos.map(([id, d]) => <option key={id} value={id}>{d}</option>)}</select></td>
-                          <td><input value={l.descricao ?? ''} placeholder={l.tipo === 'peca' ? 'ex. POS 381' : ''} onChange={(e) => muda({ descricao: e.target.value })} /></td>
-                          <td><input type="number" min={1} style={{ width: 70 }} value={l.quantidade} onChange={(e) => muda({ quantidade: Number(e.target.value) })} /></td>
-                          <td><select value={l.motivo} onChange={(e) => muda({ motivo: e.target.value as PendenciaNova['motivo'] })}><option value="falta">falta</option><option value="avaria">avaria</option></select></td>
-                          <td><input value={l.observacao ?? ''} onChange={(e) => muda({ observacao: e.target.value })} /></td>
-                          <td><button className="link" onClick={() => setLinhas((ls) => ls.filter((_, j) => j !== i))}>remover</button></td>
-                        </tr>
-                      );
-                    })}</tbody>
-                  </table>
-                  <div className="linha-acao">
-                    <button onClick={() => setLinhas((ls) => [...ls, { tipo: 'volume', material_id: null, quantidade: 1, motivo: 'falta' }])}>+ pendência</button>
-                    <button className="pri" disabled={ocupado || !linhas.length || linhas.some((l) => !l.material_id || !(l.quantidade > 0))}
-                            onClick={() => fazer(() => confirmarNF(nf.id, linhas), 'Confirmada com pendência: o que faltou ficou fora do estoque.')}>Confirmar com {linhas.length} pendência(s)</button>
-                  </div>
-                </div>
-              )}
-            </>
+          {nf.lancamento && (emConferencia || nf.situacao_exibida === 'confirmada') && (
+            <div className="linha-acao">
+              <button className="link" disabled={ocupado} onClick={() => fazer(() => desfazerRecebimento(nf.id), 'Recebimento desfeito: voltou para emitida')}>Desfazer recebimento</button>
+            </div>
           )}
           {msg && <div className={msg.startsWith('Não foi') ? 'callout' : 'notes'}>{msg}</div>}
         </div>

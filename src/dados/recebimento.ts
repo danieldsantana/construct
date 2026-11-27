@@ -110,7 +110,10 @@ async function chamar<T>(fn: string, args: Record<string, unknown>): Promise<T> 
 export const salvarNF = (nf: NFLancamento) => chamar<number>('nf_salvar', { p: nf });
 export const marcarRecebida = (nf: number, data: string, canteiro: string, linha?: string) =>
   chamar<number>('nf_marcar_recebida', { p_nf: nf, p_data: data, p_canteiro: canteiro, p_linha: linha ?? null });
-export type PendenciaNova = { tipo: 'peca' | 'volume' | 'fixador'; material_id: number | null; descricao?: string; quantidade: number; motivo: 'falta' | 'avaria'; observacao?: string };
+export type PendenciaNova = { tipo: 'peca' | 'volume' | 'fixador'; material_id: number | null; descricao?: string; quantidade: number; motivo: 'falta' | 'avaria'; observacao?: string; rnc?: string };
+// recebida e confirmada de uma vez (sem ou com pendências: o que não chegou fica fora do estoque)
+export const receberNF = (nf: number, data: string, canteiro: string, linha: string | null, pendencias: PendenciaNova[] = []) =>
+  chamar<void>('nf_receber', { p_nf: nf, p_data: data, p_canteiro: canteiro, p_linha: linha, p_pendencias: pendencias });
 export const confirmarNF = (nf: number, pendencias: PendenciaNova[] = []) => chamar<void>('nf_confirmar', { p_nf: nf, p_pendencias: pendencias });
 export const desfazerRecebimento = (nf: number) => chamar<void>('nf_desfazer_recebimento', { p_nf: nf });
 

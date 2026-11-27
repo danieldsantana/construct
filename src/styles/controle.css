@@ -469,3 +469,11 @@ body:has(.lancar.conteudo) .notas-tela .titulo .sub { display: none; }
 .panel.comparacao td.opc:hover { background: var(--line-soft); }
 .panel.comparacao td.opc.on { background: #dff3e6; color: var(--ink); font-weight: 700; box-shadow: inset 0 0 0 1.5px var(--ok); }
 .panel.comparacao td.opc.trava { cursor: default; }
+
+/* ficha da NF: recebimento com pendências */
+.fluxo table.receber td { padding: 2px 6px; font-size: 13px; }
+.fluxo table.receber input.qtd { width: 64px; text-align: right; }
+.fluxo table.receber input.rnc { width: 90px; }
+.fluxo table.receber tr.com-pend td { background: #fff4f2; }
+.fluxo table.receber.pecas { margin-top: 8px; }
+.acoes-nf button.pri.com-pend { background: var(--falta); border-color: var(--falta); }
