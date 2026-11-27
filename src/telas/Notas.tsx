@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useLayoutEffect, useMemo, useState, type ReactNode } from 'react';
+import { createPortal } from 'react-dom';
 import { useSearchParams } from 'react-router';
 import { Abas, Titulo } from '../componentes/Titulo';
 import { Gaveta } from '../componentes/Gaveta';
@@ -36,6 +37,7 @@ export function Notas() {
   const rec = useRecebimentos();
   const [vista, setVista] = useState<Vista>('lista');
   const editor = useEditor();
+  const [slotAbas, setSlotAbas] = useState<HTMLDivElement | null>(null);
   const [params] = useSearchParams();  // ?filtro=nao_recebida&nf=<id> (links da tela Início)
   const [filtro, setFiltro] = useState<Filtro>(() => {
     const f = params.get('filtro') as Filtro | null;
@@ -94,7 +96,10 @@ export function Notas() {
   return (
     <>
       <Titulo texto="Notas fiscais"><span className="num">{visiveis.length}</span></Titulo>
-      <Abas<Vista> abas={[['lista', 'Notas fiscais'], ['planilha', 'Planilha de entrada'], ...(editor ? [['lancar', 'Lançar NF'] as [Vista, string]] : [])]} atual={vista} aoMudar={setVista} />
+      <div className="abas-linha">
+        <Abas<Vista> abas={[['lista', 'Notas fiscais'], ['planilha', 'Planilha de entrada'], ...(editor ? [['lancar', 'Lançar NF'] as [Vista, string]] : [])]} atual={vista} aoMudar={setVista} />
+        <div className="abas-extra" ref={setSlotAbas} />
+      </div>
 
       {vista === 'lancar' ? <LancarNF /> : vista === 'lista' ? (
         <>
@@ -151,7 +156,7 @@ export function Notas() {
           </div>
         </>
       ) : (
-        <PlanilhaEntrada pares={paresEscopo} aoAbrir={setAbertoMov} aoAbrirNF={(id) => setAbertaNF(nfs.dados.find((x) => x.id === id) ?? null)}
+        <PlanilhaEntrada slot={slotAbas} pares={paresEscopo} aoAbrir={setAbertoMov} aoAbrirNF={(id) => setAbertaNF(nfs.dados.find((x) => x.id === id) ?? null)}
                          recebimentos={rec.dados.filter((r) => inclui(r.linha, r.canteiro))} />
       )}
 
@@ -164,7 +169,8 @@ export function Notas() {
 // Planilha de entrada como a aba ENTRADA do controle: cabeçalho completo por coluna (data de recebimento, fornecedor, NF,
 // emissão, romaneio, valor, peso, OF) e uma coluna por recebimento. Com vários canteiros no escopo, uma linha a mais no
 // cabeçalho diz o canteiro de recebimento de cada coluna, e previsto/recebido são a soma dos canteiros.
-function PlanilhaEntrada({ pares, recebimentos, aoAbrir, aoAbrirNF }: {
+function PlanilhaEntrada({ slot, pares, recebimentos, aoAbrir, aoAbrirNF }: {
+  slot: HTMLElement | null;
   pares: { linha: string; canteiro: string }[]; recebimentos: Recebimento[]; aoAbrir: (r: Recebimento) => void; aoAbrirNF: (nfId: number) => void;
 }) {
   const saldos = useSaldos();
@@ -172,7 +178,6 @@ function PlanilhaEntrada({ pares, recebimentos, aoAbrir, aoAbrirNF }: {
   const cruz = useTabelaCruz();  // cruz do mouse + seleção (clique, arrastar, Ctrl), como no Estoque
   const [soRecebidos, setSoRecebidos] = useState(false);
   const tabRef = cruz.ref;
-  const varios = pares.length > 1;
   // congela como no Excel: as linhas do cabeçalho presas no topo e as 3 primeiras colunas presas à esquerda
   useLayoutEffect(() => {
     const t = tabRef.current;
@@ -231,7 +236,11 @@ function PlanilhaEntrada({ pares, recebimentos, aoAbrir, aoAbrirNF }: {
 
   const doc = (c: Recebimento) => c.numero ?? (c.tipo === 'ajuste' ? 'Ajuste' : c.documento ?? 'Transferência');
   const cab: [string, (c: Recebimento) => ReactNode][] = [
-    ...(varios ? [['Canteiro', (c: Recebimento) => (variasLinhas ? `${c.linha} · ${c.canteiro}` : c.canteiro)] as [string, (c: Recebimento) => ReactNode]] : []),
+    ['Nota fiscal', (c) => (
+      <button className={`nfnum ${c.tipo !== 'recebimento' ? 'transf' : ''}`} onClick={() => (c.nf_id ? aoAbrirNF(c.nf_id) : aoAbrir(c))}>
+        {c.tipo === 'recebimento' ? doc(c) : c.tipo === 'ajuste' ? 'Ajuste' : `Transf. ${(c.documento ?? '').replace(/^TRANSFER[ÊE]NCIA\s*/i, '')}`.trim()}
+      </button>
+    )],
     ['Recebimento', (c) => data(c.data)],
     ['Emissão', (c) => (c.emissao ? data(c.emissao) : '')],
     ['Romaneio', (c) => c.romaneio ?? ''],
@@ -241,26 +250,23 @@ function PlanilhaEntrada({ pares, recebimentos, aoAbrir, aoAbrirNF }: {
   let parteAnt: string | null = null;
   return (
     <>
-      <div className="toolbar">
-        <label className="chk"><input type="checkbox" checked={soRecebidos} onChange={(e) => setSoRecebidos(e.target.checked)} /> Só itens recebidos</label>
-        <span className="grow" /><ResumoSelecao refSpan={cruz.resumoRef} />
-      </div>
+      {slot && createPortal(
+        <>
+          <ResumoSelecao refSpan={cruz.resumoRef} />
+          <label className="chk"><input type="checkbox" checked={soRecebidos} onChange={(e) => setSoRecebidos(e.target.checked)} /> Só itens recebidos</label>
+        </>, slot)}
       <div className="panel planilha" style={{ overflow: 'auto', maxHeight: 'calc(100vh - 300px)' }}>
         <table ref={tabRef} className="cruz" onMouseDown={cruz.onMouseDown} onMouseOver={cruz.onMouseOver} onMouseLeave={cruz.onMouseLeave}>
           <thead>
             {cab.map(([rot, f], i) => (
-              <tr key={rot} className={`cab ${rot === 'Canteiro' ? 'cab-cant' : ''}`}>
+              <tr key={rot} className={`cab ${rot === 'Nota fiscal' ? 'cab-nf' : ''}`}>
                 <th className="rot" colSpan={3}>{rot}</th>
                 {mostrar.map((c) => <td key={c.id} className={`cabv ${i === cab.length - 1 ? 'ult' : ''}`}>{f(c)}</td>)}
               </tr>
             ))}
             <tr className="tit">
               <th>Descrição</th><th className="r">Previsto</th><th className="r">Recebido</th>
-              {mostrar.map((c) => (
-                <th key={c.id} className={`colv ${c.tipo !== 'recebimento' ? 'transf' : ''}`} onClick={() => (c.nf_id ? aoAbrirNF(c.nf_id) : aoAbrir(c))}>
-                  {c.tipo === 'recebimento' ? doc(c) : c.tipo === 'ajuste' ? 'Ajuste' : `Transf. ${(c.documento ?? '').replace(/^TRANSFER[ÊE]NCIA\s*/i, '')}`.trim()}
-                </th>
-              ))}
+              {mostrar.map((c) => <th key={c.id} className="colv">{variasLinhas ? `${c.linha} · ${c.canteiro}` : c.canteiro}</th>)}
             </tr>
           </thead>
           <tbody>

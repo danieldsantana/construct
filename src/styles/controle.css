@@ -341,3 +341,18 @@ button.pri:disabled { opacity: .5; }
 .planilha thead tr.tit th.colv:hover { background: var(--navy-2); text-decoration: underline; }
 .planilha thead tr.tit th.colv.transf { background: var(--navy-2); font-weight: 600; font-size: 11px; }
 .toolbar label.chk { display: flex; gap: 6px; align-items: center; font-size: 13px; color: var(--ink); }
+
+/* linha das abas com espaço à direita (filtro e soma da planilha) */
+.abas-linha { display: flex; align-items: flex-end; gap: 12px; border-bottom: 2px solid var(--navy); margin-bottom: 12px; }
+.abas-linha > .tabs { border-bottom: 0; margin-bottom: 0; }
+.abas-extra { margin-left: auto; display: flex; align-items: center; gap: 14px; padding-bottom: 5px; }
+/* planilha: rótulos à direita; divisão discreta entre as linhas do cabeçalho; NF no topo, canteiro na faixa azul */
+.planilha thead tr.cab th.rot { text-align: right; }
+.planilha thead tr.cab th, .planilha thead tr.cab td { box-shadow: inset 0 -1px 0 #d6dce4; }
+.planilha thead tr.cab th.rot.ult-cong, .planilha thead tr.cab td.ult-cong { box-shadow: inset 0 -1px 0 #d6dce4, inset -2px 0 0 var(--line); }
+.planilha thead tr.cab-nf td.cabv { background: #fff; padding: 2px 6px; }
+.planilha button.nfnum { border: 0; background: none; padding: 0; font: inherit; font-weight: 700; color: var(--navy); cursor: pointer; }
+.planilha button.nfnum:hover { text-decoration: underline; }
+.planilha button.nfnum.transf { font-weight: 600; color: var(--muted); font-size: 11px; }
+.planilha thead tr.tit th.colv { font-weight: 600; font-size: 11px; cursor: default; }
+.planilha thead tr.tit th.colv:hover { background: var(--navy); text-decoration: none; }
