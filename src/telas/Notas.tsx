@@ -9,7 +9,7 @@ import { ResumoSelecao, useTabelaCruz } from '../componentes/TabelaCruz';
 import { useEscopo } from '../lib/escopo';
 import { colunaDaOrigem, data, num } from '../lib/formato';
 import {
-  useConferenciaNF, useLancamentos, useLeituraRomaneio, useNFItens, useNotasFiscais, usePendencias, useRecebimentos, useSaldos,
+  useLancamentos, useNFItens, useNotasFiscais, usePendencias, useRecebimentos, useSaldos,
   type NotaFiscal, type Recebimento, type SituacaoNF,
 } from '../dados/recebimento';
 
@@ -354,7 +354,7 @@ function ItensDosMovimentos({ movimentos }: { movimentos: Recebimento[] }) {
   );
 }
 
-type AbaNF = 'itens' | 'remessa' | 'pendencias';
+type AbaNF = 'itens' | 'pendencias';
 function FichaNF({ nf, recebimentos, aoFechar }: { nf: NotaFiscal | null; recebimentos: Recebimento[]; aoFechar: () => void }) {
   const movs = useMemo(() => (nf ? recebimentos.filter((r) => r.nf_id === nf.id) : []), [nf, recebimentos]);
   const nfItens = useNFItens();
@@ -381,11 +381,9 @@ function FichaNF({ nf, recebimentos, aoFechar }: { nf: NotaFiscal | null; recebi
       {nf && (
         <>
           <div className="ficha-abas">
-            <Abas<AbaNF> abas={[['itens', `Itens (${nf.itens || 0})`], ['remessa', 'Remessa × lançado'], ['pendencias', `Pendências (${nPend})`]]} atual={aba} aoMudar={setAba} />
-            {nf.arquivo && <span className="arquivo" title={nf.arquivo}>{nf.arquivo}</span>}
+            <Abas<AbaNF> abas={[['itens', `Itens (${nf.itens || 0})`], ['pendencias', `Pendências (${nPend})`]]} atual={aba} aoMudar={setAba} />
           </div>
           {aba === 'itens' && (temItensNF ? <AcoesNF nf={nf} /> : <ItensDosMovimentos movimentos={movs} />)}
-          {aba === 'remessa' && <RomaneioXLancado nfId={nf.id} recebida={!!nf.recebida_em} />}
           {aba === 'pendencias' && <PendenciasNF nf={nf} />}
         </>
       )}
@@ -409,34 +407,3 @@ function FichaRecebimento({ r, aoFechar }: { r: Recebimento | null; aoFechar: ()
   );
 }
 
-// Romaneio do PDF (SKU → volume da matriz) × o que foi lançado para a NF (ENTRADA do controle ou lançamento do app).
-function RomaneioXLancado({ nfId, recebida }: { nfId: number; recebida: boolean }) {
-  const conf = useConferenciaNF();
-  const leitura = useLeituraRomaneio();
-  const l = leitura.dados.find((x) => x.id === nfId);
-  const linhas = conf.dados.filter((c) => c.nota_fiscal_id === nfId).sort((a, b) => (a.volume ?? '~').localeCompare(b.volume ?? '~'));
-  if (conf.carregando || leitura.carregando) return null;
-  if (!l || l.romaneio_confere === null) return <p className="muted" style={{ fontSize: 13 }}>Remessa: PDF não lido.</p>;
-  if (!l.romaneio_confere) return <p className="muted" style={{ fontSize: 13 }}>Remessa do PDF não conferida ({l.romaneio_obs}); sem comparação.</p>;
-  const difs = linhas.filter((c) => Number(c.qtd_romaneio) !== Number(c.qtd_lancada));
-  return (
-    <>
-      {!recebida
-        ? <p className="muted" style={{ fontSize: 13 }}>Remessa lida e conferida com o peso{l.peso_danfe ? ` do DANFE (${num(l.peso_danfe, 1)} kg)` : ''}; a NF ainda não foi lançada.</p>
-        : <div className={difs.length ? 'callout' : 'notes'}>{difs.length ? `${difs.length} volume(s) com diferença entre a remessa e o lançado.` : 'Lançado igual à remessa em todos os volumes.'}</div>}
-      <table>
-        <thead><tr><th>Volume (matriz)</th><th className="r">Remessa</th><th className="r">Lançado</th></tr></thead>
-        <tbody>{linhas.map((c, i) => {
-          const dif = Number(c.qtd_romaneio) !== Number(c.qtd_lancada);
-          return (
-            <tr key={i}>
-              <td>{c.volume ?? <span className="muted">sem ligação com a matriz</span>}</td>
-              <td className={`r num ${dif ? 'warn' : ''}`}>{num(c.qtd_romaneio)}</td>
-              <td className={`r num ${dif ? 'warn' : ''}`}>{num(c.qtd_lancada)}</td>
-            </tr>
-          );
-        })}</tbody>
-      </table>
-    </>
-  );
-}
