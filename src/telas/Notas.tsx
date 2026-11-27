@@ -4,9 +4,8 @@ import { useSearchParams } from 'react-router';
 import { Abas, Titulo } from '../componentes/Titulo';
 import { Gaveta } from '../componentes/Gaveta';
 import { FiltroColuna } from '../componentes/FiltroColuna';
-import { AcoesNF, LancarNF } from './NotasFluxo';
+import { AcoesNF } from './NotasFluxo';
 import { ResumoSelecao, useTabelaCruz } from '../componentes/TabelaCruz';
-import { useEditor } from '../lib/sessao';
 import { useEscopo } from '../lib/escopo';
 import { colunaDaOrigem, data, num } from '../lib/formato';
 import {
@@ -14,7 +13,7 @@ import {
   type NotaFiscal, type Recebimento, type SituacaoNF,
 } from '../dados/recebimento';
 
-type Vista = 'lista' | 'planilha' | 'lancar';
+type Vista = 'lista' | 'planilha';
 type Filtro = 'todas' | 'nao_recebida' | 'recebidas' | 'em_conferencia' | 'reposicao' | 'sem_controle' | 'outros';
 const FILTROS: Filtro[] = ['todas', 'nao_recebida', 'recebidas', 'em_conferencia', 'reposicao', 'sem_controle', 'outros'];
 type Linha =
@@ -37,7 +36,6 @@ export function Notas() {
   const nfs = useNotasFiscais();
   const rec = useRecebimentos();
   const [vista, setVista] = useState<Vista>('lista');
-  const editor = useEditor();
   const [slot, setSlot] = useState<HTMLDivElement | null>(null);
   const [params] = useSearchParams();  // ?filtro=nao_recebida&nf=<id> (links da tela Início)
   const [filtro, setFiltro] = useState<Filtro>(() => {
@@ -122,7 +120,7 @@ export function Notas() {
 
   const filtros: [Filtro, string][] = [['todas', 'Todas'], ['nao_recebida', 'Emitidas (não recebidas)'], ['recebidas', 'Recebidas'], ['em_conferencia', 'Em conferência'], ['reposicao', 'Reposições (SAC)'], ['sem_controle', 'Sem controle importado'], ['outros', 'Transferências e ajustes']];
 
-  const abas = <Abas<Vista> abas={[['lista', 'Notas fiscais'], ['planilha', 'Planilha de entrada'], ...(editor ? [['lancar', 'Lançar NF'] as [Vista, string]] : [])]} atual={vista} aoMudar={setVista} />;
+  const abas = <Abas<Vista> abas={[['lista', 'Notas fiscais'], ['planilha', 'Planilha de entrada']]} atual={vista} aoMudar={setVista} />;
   const controles = vista === 'lista' ? (
     <div className="chips">
       {filtros.filter(([k]) => k === 'todas' || linhas.some((l) => passa(l, k))).map(([k, t]) => (
@@ -134,7 +132,7 @@ export function Notas() {
     <div className="notas-tela cheia">
       <Titulo texto="Notas fiscais" meio={<div className="titulo-abas">{abas}</div>}>{controles}</Titulo>
 
-      {vista === 'lancar' ? <LancarNF /> : vista === 'lista' ? (
+      {vista === 'lista' ? (
         <>
           <div className="panel conteudo">
             <table>

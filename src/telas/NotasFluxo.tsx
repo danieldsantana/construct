@@ -6,6 +6,9 @@ import {
   type NotaFiscal, type PendenciaNova,
 } from '../dados/recebimento';
 import { ofCurta, useOFs } from '../dados/ofs';
+import { useLinhas } from '../dados/torres';
+import { Titulo } from '../componentes/Titulo';
+import { createPortal } from 'react-dom';
 import { FiltroColuna } from '../componentes/FiltroColuna';
 import { useTabelaCruz } from '../componentes/TabelaCruz';
 
@@ -134,9 +137,20 @@ function numeroBR(texto: string, casas: number): string {
 const deBR = (texto: string) => texto.replace(/\./g, '').replace(',', '.');
 
 // ---------- Lançar NF manualmente: uma "coluna da ENTRADA" (cabeçalho + quantidade por item, na ordem do controle) ----------
-export function LancarNF() {
+export function LancarNFTela() {
+  const [slot, setSlot] = useState<HTMLDivElement | null>(null);
+  return (
+    <div className="notas-tela cheia">
+      <Titulo texto="Lançar NF"><div className="titulo-slot" ref={setSlot} /></Titulo>
+      <LancarNF slot={slot} />
+    </div>
+  );
+}
+
+export function LancarNF({ slot }: { slot: HTMLElement | null }) {
   const editor = useEditor();
   const saldos = useSaldos();
+  const linhas = useLinhas();
   const [cab, setCab] = useState({ numero: '', emissao: '', of: '', romaneio: '', valor: '', peso: '' });
   const [linha, setLinha] = useState('');
   const [destino, setDestino] = useState('');
@@ -154,8 +168,17 @@ export function LancarNF() {
   }, [aviso]);
 
   const canteiros = useMemo(() => [...new Set(saldos.dados.filter((s) => s.linha === linha && n(s.previsto) > 0).map((s) => s.canteiro))], [saldos.dados, linha]);
-  const itens = useMemo(() => saldos.dados.filter((s) => s.linha === linha && s.canteiro === destino && n(s.previsto) > 0).sort((a, b) => a.ordem - b.ordem),
-    [saldos.dados, linha, destino]);
+  const outros = useMemo(() => [...new Set(saldos.dados.map((s) => s.canteiro))].filter((c) => !canteiros.includes(c)), [saldos.dados, canteiros]);
+  const itens = useMemo(() => {
+    if (!linha || !destino) return [];
+    const m = new Map<number, (typeof saldos.dados)[number]>();
+    for (const s of saldos.dados) {
+      if (s.linha !== linha) continue;
+      if (s.canteiro === destino) m.set(s.material_id, s);
+      else if (n(s.previsto) > 0 && !m.has(s.material_id)) m.set(s.material_id, { ...s, canteiro: destino, previsto: 0, recebido: 0, saido: 0, saldo: 0 });
+    }
+    return [...m.values()].filter((s) => n(s.previsto) > 0 || canteiros.includes(destino) === false).sort((a, b) => a.ordem - b.ordem);
+  }, [saldos.dados, linha, destino, canteiros]);
   const ofs = useOFs();
   const ofsLinha = useMemo(() => ofs.dados.filter((o) => o.linha === linha).sort((a, b) => (a.numero ?? 0) - (b.numero ?? 0)), [ofs.dados, linha]);
   // tipos de torre na ordem do controle; itens sem tipo = fixadores
@@ -183,9 +206,10 @@ export function LancarNF() {
           <label>Nota fiscal <input value={cab.numero} inputMode="numeric" onChange={(e) => setCab({ ...cab, numero: e.target.value.replace(/\D/g, '') })} /></label>
           <label>Data de emissão <input type="date" value={cab.emissao} onChange={(e) => setCab({ ...cab, emissao: e.target.value })} /></label>
           <label>Linha <select value={linha} onChange={(e) => { setLinha(e.target.value); setDestino(''); setQtd({}); setTipo(""); setFiltroDesc(null); setCab({ ...cab, of: '' }); }}>
-            <option value="">—</option><option>T3</option><option>T4</option></select></label>
+            <option value="">—</option>{linhas.dados.map((l) => <option key={l.sigla} value={l.sigla}>{l.codigo} - {l.sigla}</option>)}</select></label>
           <label>Canteiro de destino <select value={destino} disabled={!linha} onChange={(e) => { setDestino(e.target.value); setQtd({}); setTipo(""); setFiltroDesc(null); }}>
-            <option value="">—</option>{canteiros.map((c) => <option key={c}>{c}</option>)}</select></label>
+            <option value="">—</option>{canteiros.map((c) => <option key={c}>{c}</option>)}
+            {outros.length > 0 && <optgroup label="Fora do trecho">{outros.map((c) => <option key={c}>{c}</option>)}</optgroup>}</select></label>
           <label>OF <select value={cab.of} disabled={!linha} onChange={(e) => setCab({ ...cab, of: e.target.value })}>
             <option value="">—</option>{ofsLinha.map((o) => <option key={o.id} value={o.codigo}>{[ofCurta(o), o.canteiro].filter(Boolean).join(' · ')}</option>)}</select></label>
           <label>Valor NF <span className="campo-pre"><i>R$</i><input value={cab.valor} inputMode="decimal" onChange={(e) => setCab({ ...cab, valor: numeroBR(e.target.value, 2) })} /></span></label>
@@ -204,12 +228,15 @@ export function LancarNF() {
         </div>
         {msg && <div className="callout" style={{ marginTop: 8 }}>{msg}</div>}
       </div>
+      {slot && destino && createPortal(
+        <label className="chk">Tipo <select value={tipo} onChange={(e) => { setTipo(e.target.value); setFiltroDesc(null); }}>
+          <option value="">Todos</option>{tipos.map((t) => <option key={t}>{t}</option>)}</select></label>, slot)}
       {destino && (
         <div className="panel planilha lancar-grade">
           <table ref={cruz.ref} className="cruz" onMouseDown={cruz.onMouseDown} onMouseOver={cruz.onMouseOver} onMouseLeave={cruz.onMouseLeave}>
             <thead><tr className="tit">
               <th>{<FiltroColuna titulo="Descrição" valores={doTipo.map((i) => i.descricao)} selecionados={filtroDesc} aoMudar={setFiltroDesc} />}</th>
-              <th className="r">Previsto</th><th className="r">Recebido</th><th className="nfcolh">NF {cab.numero || '—'}</th>
+              <th className="r">Previsto</th><th className="r">Recebido</th><th className="nfcolh">{cab.numero}</th>
             </tr></thead>
             <tbody>{visiveis.flatMap((i) => {
               const out = [];

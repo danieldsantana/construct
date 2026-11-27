@@ -36,7 +36,12 @@ export function FiltroColuna({ titulo, valores, selecionados, aoMudar, ordem }: 
       <button className={`fc-bt ${selecionados ? 'ativo' : ''}`} onClick={(e) => { e.stopPropagation(); setAberto(!aberto); }} aria-label={`Filtrar ${titulo}`}>▾</button>
       {aberto && (
         <div className="fc-pop" onClick={(e) => e.stopPropagation()}>
-          <input autoFocus placeholder="Buscar" value={busca} onChange={(e) => setBusca(e.target.value)} />
+          <input autoFocus placeholder="Buscar" value={busca} onChange={(e) => {
+            const b = e.target.value;
+            setBusca(b);
+            const q = b.trim().toLowerCase();
+            aoMudar(q ? new Set(contagem.filter(([v]) => v.toLowerCase().includes(q)).map(([v]) => v)) : null);
+          }} />
           <label className="fc-tudo">
             <input type="checkbox" checked={todosVis} onChange={() => {
               const base = new Set(selecionados ?? contagem.map(([x]) => x));

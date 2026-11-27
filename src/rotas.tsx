@@ -3,6 +3,7 @@ import { Moldura } from './telas/Moldura';
 import { Inicio } from './telas/Inicio';
 import { Torres } from './telas/Torres';
 import { Notas } from './telas/Notas';
+import { LancarNFTela } from './telas/NotasFluxo';
 import { Estoque } from './telas/Estoque';
 import { OFs } from './telas/OFs';
 import { RNCs } from './telas/RNCs';
@@ -17,6 +18,7 @@ export const roteador = createHashRouter([
       { path: 'lista', element: <Torres aba="lista" key="lista" /> },
       { path: 'mapa', element: <Torres aba="mapa" key="mapa" /> },
       { path: 'torres', element: <Navigate to="/lista" replace /> },  // endereço antigo
+      { path: 'lancar', element: <LancarNFTela /> },
       { path: 'notas', element: <Notas /> },
       { path: 'estoque', element: <Estoque /> },
       { path: 'ofs', element: <OFs /> },

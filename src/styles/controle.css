@@ -428,3 +428,11 @@ body:has(.lancar.conteudo) .scopebar button.on { background: transparent; color:
   80% { opacity: 1; transform: translateY(0); }
   100% { opacity: 0; transform: translateY(8px); }
 }
+
+/* Lançar NF: coluna de lançamento como a da planilha (sem caixa laranja); campo parece célula */
+.lancar-grade.planilha thead th.nfcolh { background: var(--navy); color: #fff; min-width: 80px; }
+.lancar-grade.planilha input.qtd { width: 72px; background: transparent; border: 0; border-radius: 0; box-shadow: none; outline: none; }
+.lancar-grade.planilha input.qtd:focus { background: #fff; box-shadow: inset 0 0 0 1.5px var(--navy); }
+.lancar-grade.planilha td:has(> input.qtd) { padding: 0; }
+.titulo .titulo-slot label.chk select { margin-left: 6px; color: var(--ink); }
+body:has(.lancar.conteudo) .notas-tela .titulo .sub { display: none; }

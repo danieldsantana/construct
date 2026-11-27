@@ -8,6 +8,7 @@ const MENUS: [string, string][] = [
   ['/', 'Início'],
   ['/lista', 'Lista'],
   ['/mapa', 'Mapa'],
+  ['/lancar', 'Lançar NF'],
   ['/notas', 'Notas fiscais'],
   ['/estoque', 'Estoque'],
   ['/ofs', 'OFs'],
