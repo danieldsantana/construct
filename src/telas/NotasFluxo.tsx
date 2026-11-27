@@ -203,8 +203,15 @@ export function LancarNF({ slot }: { slot: HTMLElement | null }) {
       if (s.canteiro === destino) m.set(s.material_id, s);
       else if (n(s.previsto) > 0 && !m.has(s.material_id)) m.set(s.material_id, { ...s, canteiro: destino, previsto: 0, recebido: 0, saido: 0, saldo: 0 });
     }
-    return [...m.values()].filter((s) => n(s.previsto) > 0 || canteiros.includes(destino) === false).sort((a, b) => a.ordem - b.ordem);
-  }, [saldos.dados, linha, destino, canteiros]);
+    const lista = [...m.values()].filter((s) => n(s.previsto) > 0 || canteiros.includes(destino) === false);
+    const tem = new Set(lista.map((s) => s.material_id));
+    for (const id of Object.keys(qtd).map(Number)) {
+      if (tem.has(id)) continue;
+      const base = saldos.dados.find((s) => s.material_id === id);
+      if (base) { lista.push({ ...base, linha, canteiro: destino, previsto: 0, recebido: 0, saido: 0, saldo: 0 }); tem.add(id); }
+    }
+    return lista.sort((a, b) => a.ordem - b.ordem);
+  }, [saldos.dados, linha, destino, canteiros, qtd]);
   const ofs = useOFs();
   const ofsLinha = useMemo(() => ofs.dados.filter((o) => o.linha === linha).sort((a, b) => (a.numero ?? 0) - (b.numero ?? 0)), [ofs.dados, linha]);
   // tipos de torre na ordem do controle; itens sem tipo = fixadores
@@ -316,6 +323,17 @@ export function LancarNF({ slot }: { slot: HTMLElement | null }) {
   const semOFnoDanfe = !!atual && !/BRM-\d+|^\s*OF\s*-\s*\d+/.test(atual.l.oc ?? '');
   const jaCadastrada = (nf: string | null) => nfsCad.dados.some((x) => x.numero === nf && (x.itens > 0 || x.recebida_em));
 
+  const limpar = () => {
+    setCab({ numero: '', emissao: '', of: '', romaneio: '', valor: '', peso: '' }); setQtd({}); setSemPar([]); setEscolha({});
+    setLinha(''); setDestino(''); setTipo(''); setFiltroDesc(null); setMsg(null);
+  };
+  const fechar = async () => {
+    const resto = lidas.filter((x) => x !== atual);
+    limpar(); setAtual(null); setPdfAberto(null); setLidas(resto);
+    const prox = resto.find((x) => !jaCadastrada(x.l.nf));
+    if (prox) await aplicar(prox);
+  };
+  const fecharTodas = () => { limpar(); setAtual(null); setPdfAberto(null); setLidas([]); };
   const salvar = async () => {
     setOcupado(true); setMsg(null);
     try {
@@ -395,6 +413,8 @@ export function LancarNF({ slot }: { slot: HTMLElement | null }) {
           <button className="pri" disabled={ocupado || !cab.numero || !destino || (!cab.of && !semOFnoDanfe) || !preenchidos.length || recebida
                                            || (comItens && !difs.some((d) => lado(d) === 'novo'))} onClick={salvar}>
             {comItens ? 'Atualizar NF' : 'Lançar como emitida'}</button>
+          {(atual || cab.numero) && <button onClick={fechar}>Fechar NF</button>}
+          {lidas.length > 1 && <button className="link" onClick={fecharTodas}>Fechar todas</button>}
         </div>
         {msg && <div className="callout" style={{ marginTop: 8 }}>{msg}</div>}
         {existente && (recebida || comItens) && !difs.length && (
