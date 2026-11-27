@@ -94,7 +94,7 @@ export function Tabela({ grupos, sel, abrir, todos }: { grupos: Grupo[]; sel: st
                 <td>{g.sacs.map((s) => <span key={s} className="st info" style={{ marginRight: 4 }}>{sacTexto(s)}</span>)}
                   {outras.size > 0 && <span className="muted" style={{ fontSize: 12 }} title="O mesmo SAC também cita estas RNCs"> + {[...outras].map(rncTexto).join(', ')}</span>}</td>
                 <td className="r num">{g.nfs.length}</td>
-                <td className="num">{g.nfs.slice(0, 4).map((n) => n.numero).join(' · ')}{g.nfs.length > 4 ? ' …' : ''}</td>
+                <td className="num">{g.nfs.map((n) => n.numero).join(' · ')}</td>
                 <td>{g.destinos.join(', ') || '—'}</td>
                 <td className="num">{data(g.ultima)}</td>
                 <td className="r num">{lancadas ? `${lancadas} de ${g.nfs.length}` : ''}</td>

@@ -169,7 +169,6 @@ function PlanilhaEntrada({ pares, recebimentos, aoAbrir, aoAbrirNF }: {
 }) {
   const saldos = useSaldos();
   const lanc = useLancamentos();
-  const [limitar, setLimitar] = useState<boolean | null>(null);  // null = automático
   const cruz = useTabelaCruz();  // cruz do mouse + seleção (clique, arrastar, Ctrl), como no Estoque
   const tabRef = cruz.ref;
   const varios = pares.length > 1;
@@ -204,10 +203,8 @@ function PlanilhaEntrada({ pares, recebimentos, aoAbrir, aoAbrirNF }: {
       || pos(a.linha, a.canteiro) - pos(b.linha, b.canteiro) || colunaDaOrigem(a.origem) - colunaDaOrigem(b.origem)),
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [recebimentos, pares]);
-  // todas as colunas por padrão; só limita às 25 mais recentes quando são muitas (ex. obra toda), para não pesar
-  const muitas = colunas.length > 300;
-  const limitado = limitar ?? muitas;
-  const mostrar = limitado ? colunas.slice(-25) : colunas;
+  // SEM limite: todos os recebimentos do escopo aparecem (nada pode ser omitido — auditoria)
+  const mostrar = colunas;
   const qtd = useMemo(() => {
     const ids = new Set(colunas.map((c) => c.id));
     const m = new Map<string, number>();
@@ -243,9 +240,8 @@ function PlanilhaEntrada({ pares, recebimentos, aoAbrir, aoAbrirNF }: {
   return (
     <>
       <div className="toolbar">
-        <span className={limitado ? 'warn' : 'muted'}>{limitado ? `Mostrando só os 25 recebimentos mais recentes de ${colunas.length}` : `${colunas.length} colunas`}, {varios ? 'na ordem de recebimento' : 'na ordem do controle'} · só itens com previsto ou recebimento</span>
+        <span className="muted">{colunas.length} recebimentos (todos), {varios ? 'na ordem de recebimento' : 'na ordem do controle'} · itens com previsto ou recebimento</span>
         <span className="grow" /><ResumoSelecao refSpan={cruz.resumoRef} />
-        <button onClick={() => setLimitar(!limitado)}>{limitado ? 'Mostrar todas as colunas' : 'Só as 25 mais recentes'}</button>
       </div>
       <div className="panel planilha" style={{ overflow: 'auto', maxHeight: 'calc(100vh - 300px)' }}>
         <table ref={tabRef} className="cruz" onMouseDown={cruz.onMouseDown} onMouseOver={cruz.onMouseOver} onMouseLeave={cruz.onMouseLeave}>
