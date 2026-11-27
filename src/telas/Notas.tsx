@@ -170,6 +170,7 @@ function PlanilhaEntrada({ pares, recebimentos, aoAbrir, aoAbrirNF }: {
   const saldos = useSaldos();
   const lanc = useLancamentos();
   const cruz = useTabelaCruz();  // cruz do mouse + seleção (clique, arrastar, Ctrl), como no Estoque
+  const [soRecebidos, setSoRecebidos] = useState(false);
   const tabRef = cruz.ref;
   const varios = pares.length > 1;
   // congela como no Excel: as linhas do cabeçalho presas no topo e as 3 primeiras colunas presas à esquerda
@@ -185,12 +186,13 @@ function PlanilhaEntrada({ pares, recebimentos, aoAbrir, aoAbrirNF }: {
     const w = [0, 1, 2].map((i) => tit.cells[i]?.offsetWidth ?? 0);
     const esq = [0, w[0], w[0] + w[1]];
     for (const tr of t.rows) {
-      for (let i = 0; i < 3 && i < tr.cells.length; i++) {
-        const c = tr.cells[i];
-        if (c.colSpan > 3) continue;
-        c.style.position = 'sticky'; c.style.left = `${esq[i]}px`;
+      let col = 0;
+      for (const c of tr.cells) {
+        if (col >= 3 || col + c.colSpan > 3) break;
+        c.style.position = 'sticky'; c.style.left = `${esq[col]}px`;
         c.style.zIndex = tr.parentElement === t.tHead ? '4' : '1';
-        if (i === 2) c.classList.add('ult-cong');
+        col += c.colSpan;
+        if (col === 3) c.classList.add('ult-cong');
       }
     }
   });
@@ -230,16 +232,17 @@ function PlanilhaEntrada({ pares, recebimentos, aoAbrir, aoAbrirNF }: {
   const doc = (c: Recebimento) => c.numero ?? (c.tipo === 'ajuste' ? 'Ajuste' : c.documento ?? 'Transferência');
   const cab: [string, (c: Recebimento) => ReactNode][] = [
     ...(varios ? [['Canteiro', (c: Recebimento) => (variasLinhas ? `${c.linha} · ${c.canteiro}` : c.canteiro)] as [string, (c: Recebimento) => ReactNode]] : []),
-    ['Data de recebimento', (c) => data(c.data)],
-    ['Nota fiscal', (c) => <button className="link" onClick={() => (c.nf_id ? aoAbrirNF(c.nf_id) : aoAbrir(c))}>{doc(c)}</button>],
-    ['Data de emissão', (c) => data(c.emissao)],
+    ['Recebimento', (c) => data(c.data)],
+    ['Emissão', (c) => (c.emissao ? data(c.emissao) : '')],
     ['Romaneio', (c) => c.romaneio ?? ''],
   ];
+  const linhasItens = soRecebidos ? itens.filter((i) => i.recebido !== 0) : itens;
   let secao = '';
   let parteAnt: string | null = null;
   return (
     <>
       <div className="toolbar">
+        <label className="chk"><input type="checkbox" checked={soRecebidos} onChange={(e) => setSoRecebidos(e.target.checked)} /> Só itens recebidos</label>
         <span className="grow" /><ResumoSelecao refSpan={cruz.resumoRef} />
       </div>
       <div className="panel planilha" style={{ overflow: 'auto', maxHeight: 'calc(100vh - 300px)' }}>
@@ -247,19 +250,21 @@ function PlanilhaEntrada({ pares, recebimentos, aoAbrir, aoAbrirNF }: {
           <thead>
             {cab.map(([rot, f], i) => (
               <tr key={rot} className={`cab ${rot === 'Canteiro' ? 'cab-cant' : ''}`}>
-                <th className="rot" colSpan={1}>{rot}</th><th className="vazio-cab" /><th className="vazio-cab" />
-                {mostrar.map((c) => {
-                  return <td key={c.id} className={`cabv ${i === cab.length - 1 ? 'ult' : ''}`}>{f(c)}</td>;
-                })}
+                <th className="rot" colSpan={3}>{rot}</th>
+                {mostrar.map((c) => <td key={c.id} className={`cabv ${i === cab.length - 1 ? 'ult' : ''}`}>{f(c)}</td>)}
               </tr>
             ))}
             <tr className="tit">
               <th>Descrição</th><th className="r">Previsto</th><th className="r">Recebido</th>
-              {mostrar.map((c) => <th key={c.id} className="colv" title={`${doc(c)} · ${c.canteiro}`} onClick={() => aoAbrir(c)} />)}
+              {mostrar.map((c) => (
+                <th key={c.id} className={`colv ${c.tipo !== 'recebimento' ? 'transf' : ''}`} onClick={() => (c.nf_id ? aoAbrirNF(c.nf_id) : aoAbrir(c))}>
+                  {c.tipo === 'recebimento' ? doc(c) : c.tipo === 'ajuste' ? 'Ajuste' : `Transf. ${(c.documento ?? '').replace(/^TRANSFER[ÊE]NCIA\s*/i, '')}`.trim()}
+                </th>
+              ))}
             </tr>
           </thead>
           <tbody>
-            {itens.flatMap((s) => {
+            {linhasItens.flatMap((s) => {
               const out = [];
               if (s.secao !== secao) {
                 secao = s.secao;
