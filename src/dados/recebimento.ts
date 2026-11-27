@@ -99,7 +99,8 @@ export const usePendencias = () =>
   useTabela<Pendencia>('nf_pendencia_detalhe', 'id, nota_fiscal_id, nf, tipo, material_id, material, descricao, quantidade, motivo, observacao, rnc, sac, abertura, situacao, criado_em', ['id']);
 
 export type NFLancamento = { numero: string; emissao?: string; of?: string; romaneio?: string; valor?: string; peso?: string; linha: string; destino: string;
-  lancamento: 'pdf' | 'manual'; itens: { material_id: number; quantidade: number }[] };
+  lancamento: 'pdf' | 'manual'; itens: { material_id: number; quantidade: number }[];
+  arquivo?: string; peso_danfe?: number | null; romaneio_itens?: unknown[]; romaneio_confere?: boolean; romaneio_obs?: string };
 async function chamar<T>(fn: string, args: Record<string, unknown>): Promise<T> {
   const { data, error } = await supabase.rpc(fn, args);
   if (error) throw new Error(error.message);
@@ -112,3 +113,12 @@ export const marcarRecebida = (nf: number, data: string, canteiro: string, linha
 export type PendenciaNova = { tipo: 'peca' | 'volume' | 'fixador'; material_id: number | null; descricao?: string; quantidade: number; motivo: 'falta' | 'avaria'; observacao?: string };
 export const confirmarNF = (nf: number, pendencias: PendenciaNova[] = []) => chamar<void>('nf_confirmar', { p_nf: nf, p_pendencias: pendencias });
 export const desfazerRecebimento = (nf: number) => chamar<void>('nf_desfazer_recebimento', { p_nf: nf });
+
+// Lançamento pelo PDF: canteiro pelo município do local de entrega; item do controle sugerido para cada linha do romaneio
+export const useCanteiros = () => useTabela<{ nome: string; municipio: string | null }>('canteiro', 'nome, municipio', ['nome']);
+export type Sugestao = { seq: number; material_id: number | null; como: 'volume' | 'fixador' | 'ambiguo' | 'peca' | 'sem' };
+export async function sugerirItens(linha: string, canteiro: string, itens: { seq: number; sku: string; descricao: string; descricao_pa: string; tipo_ud: string }[]) {
+  const { data, error } = await supabase.rpc('nf_sugerir_itens', { p_linha: linha, p_canteiro: canteiro, p_itens: itens });
+  if (error) throw new Error(error.message);
+  return data as Sugestao[];
+}

@@ -2,9 +2,11 @@ import { useEffect, useMemo, useState } from 'react';
 import { useEditor } from '../lib/sessao';
 import { num } from '../lib/formato';
 import {
-  confirmarNF, desfazerRecebimento, marcarRecebida, salvarNF, useNFItens, usePendencias, useSaldos,
+  confirmarNF, desfazerRecebimento, marcarRecebida, salvarNF, sugerirItens, useCanteiros, useNFItens, useNotasFiscais, usePendencias, useSaldos,
   type NotaFiscal, type PendenciaNova,
 } from '../dados/recebimento';
+import { lerNFs, problemasRomaneio, type LeituraNF } from '../lib/lerNF';
+import { paginasDoPdf } from '../lib/pdfTexto';
 import { ofCurta, useOFs } from '../dados/ofs';
 import { useLinhas } from '../dados/torres';
 import { Titulo } from '../componentes/Titulo';
@@ -135,6 +137,10 @@ function numeroBR(texto: string, casas: number): string {
   return resto.length ? `${milhar},${resto.join('').slice(0, casas)}` : milhar;
 }
 const deBR = (texto: string) => texto.replace(/\./g, '').replace(',', '.');
+const paraBR = (v: number | null, casas: number) => (v === null ? '' : v.toLocaleString('pt-BR', { minimumFractionDigits: casas, maximumFractionDigits: casas }));
+const normaliza = (t: string | null | undefined) => (t ?? '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[–—]/g, '-').replace(/\s+/g, ' ').trim().toUpperCase();
+type Lida = { arquivo: string; l: LeituraNF };
+type SemPar = { seq: number; descricao: string; quantidade: number; como: string };
 
 // ---------- Lançar NF manualmente: uma "coluna da ENTRADA" (cabeçalho + quantidade por item, na ordem do controle) ----------
 export function LancarNFTela() {
@@ -161,6 +167,13 @@ export function LancarNF({ slot }: { slot: HTMLElement | null }) {
   const [tipo, setTipo] = useState('');
   const [filtroDesc, setFiltroDesc] = useState<Set<string> | null>(null);
   const cruz = useTabelaCruz();
+  const cantCad = useCanteiros();
+  const nfsCad = useNotasFiscais();
+  const [lidas, setLidas] = useState<Lida[]>([]);
+  const [atual, setAtual] = useState<Lida | null>(null);
+  const [semPar, setSemPar] = useState<SemPar[]>([]);
+  const [lendo, setLendo] = useState(false);
+  const [arrastando, setArrastando] = useState(false);
   useEffect(() => {
     if (!aviso) return;
     const t = setTimeout(() => setAviso(null), 3600);
@@ -189,18 +202,93 @@ export function LancarNF({ slot }: { slot: HTMLElement | null }) {
   const preenchidos = itens.filter((i) => n(qtd[i.material_id]) !== 0);
 
   if (!editor) return <p className="muted">Lançamento só para quem tem perfil de edição.</p>;
+
+  // ---------- leitura do PDF: preenche cabeçalho, linha, destino, OF e as quantidades sugeridas pelo romaneio ----------
+  const aplicar = async (x: Lida) => {
+    const l = x.l;
+    setAtual(x); setMsg(null); setTipo(''); setFiltroDesc(null); setSemPar([]); setQtd({});
+    const nOF = Number(l.oc?.match(/BRM-(\d+)/)?.[1] ?? l.oc?.match(/^\s*OF\s*-\s*(\d+)/)?.[1] ?? NaN);
+    const doLt = linhas.dados.find((li) => l.lt && normaliza(l.lt).startsWith(normaliza(li.nome)))?.sigla;
+    const cands = ofs.dados.filter((o) => o.numero === nOF);
+    const of = cands.find((o) => o.linha === doLt) ?? (cands.length === 1 ? cands[0] : undefined);
+    const lin = of?.linha ?? doLt ?? '';
+    const mun = normaliza(l.municipio_entrega ?? l.municipio_destinatario);
+    const can = cantCad.dados.find((c) => c.municipio && c.municipio === mun)?.nome ?? '';
+    setLinha(lin); setDestino(can);
+    setCab({ numero: l.nf ?? '', emissao: l.emissao ?? '', of: of?.codigo ?? '', romaneio: l.remessa ?? '', valor: paraBR(l.valor, 2), peso: paraBR(l.peso_liquido, 3) });
+    if (!lin || !can || !l.romaneio.length) {
+      setSemPar(l.romaneio.map((r) => ({ seq: r.seq, descricao: `${r.descricao_pa} ${r.descricao}`.trim(), quantidade: r.quantidade, como: 'sem' })));
+      return;
+    }
+    try {
+      const sug = await sugerirItens(lin, can, l.romaneio.map((r) => ({ seq: r.seq, sku: r.sku, descricao: r.descricao, descricao_pa: r.descricao_pa, tipo_ud: r.tipo_ud })));
+      const porSeq = new Map(sug.map((g) => [g.seq, g]));
+      const q: Record<number, number> = {};
+      const sem: SemPar[] = [];
+      for (const r of l.romaneio) {
+        const g = porSeq.get(r.seq);
+        if (g?.material_id) q[g.material_id] = (q[g.material_id] ?? 0) + r.quantidade;
+        else sem.push({ seq: r.seq, descricao: `${r.descricao_pa} ${r.descricao}`.trim(), quantidade: r.quantidade, como: g?.como ?? 'sem' });
+      }
+      setQtd(Object.fromEntries(Object.entries(q).map(([k, v]) => [k, String(v)])));
+      setSemPar(sem);
+    } catch (e) { setMsg(`Não foi possível: ${(e as Error).message}`); }
+  };
+  const lerArquivos = async (arqs: File[]) => {
+    const pdfs = arqs.filter((a) => /\.pdf$/i.test(a.name));
+    if (!pdfs.length) return;
+    setLendo(true); setMsg(null);
+    try {
+      const novas: Lida[] = [];
+      for (const a of pdfs) for (const l of lerNFs(await paginasDoPdf(a))) novas.push({ arquivo: a.name, l });
+      const erros = novas.filter((x) => x.l.erro || !x.l.nf);
+      if (erros.length) setMsg(`Não foi possível ler: ${erros.map((x) => `${x.arquivo} (${x.l.erro ?? 'número da NF não encontrado'})`).join(', ')}`);
+      const ok = novas.filter((x) => !x.l.erro && x.l.nf);
+      setLidas(ok);
+      if (ok.length) await aplicar(ok[0]);
+    } catch (e) { setMsg(`Não foi possível ler o PDF: ${(e as Error).message}`); } finally { setLendo(false); }
+  };
+  // NF de reposição (SAC) não traz OF no DANFE: lança sem OF
+  const semOFnoDanfe = !!atual && !/BRM-\d+|^\s*OF\s*-\s*\d+/.test(atual.l.oc ?? '');
+  const jaCadastrada = (nf: string | null) => nfsCad.dados.some((x) => x.numero === nf && (x.itens > 0 || x.recebida_em));
+
   const salvar = async () => {
     setOcupado(true); setMsg(null);
     try {
-      await salvarNF({ ...cab, valor: deBR(cab.valor), peso: deBR(cab.peso), linha, destino, lancamento: 'manual', itens: preenchidos.map((i) => ({ material_id: i.material_id, quantidade: n(qtd[i.material_id]) })) });
+      const l = atual?.l;
+      const probs = l ? problemasRomaneio(l) : [];
+      await salvarNF({
+        ...cab, valor: deBR(cab.valor), peso: deBR(cab.peso), linha, destino, lancamento: l ? 'pdf' : 'manual',
+        itens: preenchidos.map((i) => ({ material_id: i.material_id, quantidade: n(qtd[i.material_id]) })),
+        ...(l ? { arquivo: atual!.arquivo, peso_danfe: l.peso_liquido, romaneio_itens: l.romaneio, romaneio_confere: !probs.length, romaneio_obs: probs.join('; ') } : {}),
+      });
       setAviso({ id: Date.now(), texto: `NF ${cab.numero} cadastrada` });
-      setCab({ numero: '', emissao: '', of: '', romaneio: '', valor: '', peso: '' }); setQtd({});
+      setCab({ numero: '', emissao: '', of: '', romaneio: '', valor: '', peso: '' }); setQtd({}); setSemPar([]);
+      const prox = lidas.find((x) => x !== atual && x.l.nf !== cab.numero && !jaCadastrada(x.l.nf));
+      setLidas((ls) => ls.filter((x) => x !== atual));
+      setAtual(null);
+      if (prox) await aplicar(prox);
     } catch (e) { setMsg(`Não foi possível: ${(e as Error).message}`); } finally { setOcupado(false); }
   };
   let secao = '';
   let parteAnt: string | null = null;
   return (
-    <div className="lancar conteudo">
+    <div className={`lancar conteudo ${arrastando ? 'arrastando' : ''}`}
+         onDragOver={(e) => { e.preventDefault(); setArrastando(true); }} onDragLeave={() => setArrastando(false)}
+         onDrop={(e) => { e.preventDefault(); setArrastando(false); lerArquivos([...e.dataTransfer.files]); }}>
+      {slot && createPortal(
+        <label className={`bt-pdf ${lendo ? 'lendo' : ''}`}>
+          {lendo ? 'Lendo…' : 'Ler PDF'}
+          <input type="file" accept="application/pdf,.pdf" multiple hidden disabled={lendo}
+                 onChange={(e) => { lerArquivos([...(e.target.files ?? [])]); e.target.value = ''; }} />
+        </label>, slot)}
+      {lidas.length > 1 && (
+        <div className="nfs-lidas">
+          {lidas.map((x) => (
+            <button key={`${x.arquivo}|${x.l.nf}`} className={`chip ${x === atual ? 'on' : ''} ${jaCadastrada(x.l.nf) ? 'feita' : ''}`} onClick={() => aplicar(x)}>NF {x.l.nf}</button>
+          ))}
+        </div>
+      )}
       <div className="panel" style={{ padding: 12, marginBottom: 10 }}>
         <div className="campos">
           <label>Nota fiscal <input value={cab.numero} inputMode="numeric" onChange={(e) => setCab({ ...cab, numero: e.target.value.replace(/\D/g, '') })} /></label>
@@ -220,14 +308,21 @@ export function LancarNF({ slot }: { slot: HTMLElement | null }) {
           <span className="num">Peso pelos itens: <b>{num(peso, 1)} kg</b>{cab.peso && <> · NF: <b>{num(Number(deBR(cab.peso)), 1)} kg</b>
             {Math.abs(peso - Number(deBR(cab.peso))) > 1 && <span className="warn"> (diferença {num(peso - Number(deBR(cab.peso)), 1)} kg)</span>}</>}</span>
           <span className="grow" />
-          {destino && (
-            <label className="chk">Tipo <select value={tipo} onChange={(e) => { setTipo(e.target.value); setFiltroDesc(null); }}>
-              <option value="">Todos</option>{tipos.map((t) => <option key={t}>{t}</option>)}</select></label>
-          )}
-          <button className="pri" disabled={ocupado || !cab.numero || !destino || !cab.of || !preenchidos.length} onClick={salvar}>Lançar como emitida</button>
+          <button className="pri" disabled={ocupado || !cab.numero || !destino || (!cab.of && !semOFnoDanfe) || !preenchidos.length} onClick={salvar}>Lançar como emitida</button>
         </div>
         {msg && <div className="callout" style={{ marginTop: 8 }}>{msg}</div>}
+        {atual && jaCadastrada(atual.l.nf) && <div className="callout" style={{ marginTop: 8 }}>NF {atual.l.nf} já cadastrada</div>}
       </div>
+      {semPar.length > 0 && (
+        <div className="panel sem-par">
+          <table>
+            <thead><tr><th colSpan={3}>Romaneio sem correspondência no controle ({semPar.length})</th></tr></thead>
+            <tbody>{semPar.map((r) => (
+              <tr key={r.seq}><td className="r num">{r.seq}</td><td>{r.descricao}</td><td className="r num">{num(r.quantidade)}</td></tr>
+            ))}</tbody>
+          </table>
+        </div>
+      )}
       {slot && destino && createPortal(
         <label className="chk">Tipo <select value={tipo} onChange={(e) => { setTipo(e.target.value); setFiltroDesc(null); }}>
           <option value="">Todos</option>{tipos.map((t) => <option key={t}>{t}</option>)}</select></label>, slot)}

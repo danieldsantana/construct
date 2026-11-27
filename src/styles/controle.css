@@ -438,3 +438,14 @@ body:has(.lancar.conteudo) .scopebar button.on { background: transparent; color:
 body:has(.lancar.conteudo) .notas-tela .titulo .sub { display: none; }
 .titulo .titulo-slot label.chk { display: flex; flex-direction: row; align-items: center; gap: 6px; white-space: nowrap; }
 .titulo .titulo-slot label.chk select { margin: 0; width: auto; }
+
+/* Lançar NF pelo PDF */
+.titulo .titulo-slot .bt-pdf { background: #fff; color: var(--orange); font-weight: 700; padding: 3px 14px; cursor: pointer; border-radius: 2px; font-size: 13.5px; }
+.titulo .titulo-slot .bt-pdf:hover { background: var(--orange-tint); }
+.titulo .titulo-slot .bt-pdf.lendo { opacity: .7; cursor: progress; }
+.lancar.arrastando { outline: 2px dashed var(--orange); outline-offset: -4px; }
+.nfs-lidas { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 8px; }
+.nfs-lidas .chip.feita { opacity: .5; text-decoration: line-through; }
+.panel.sem-par { max-height: 170px; overflow: auto; margin-bottom: 10px; flex: 0 0 auto; }
+.panel.sem-par td { padding: 1px 8px; font-size: 12.5px; }
+.panel.sem-par thead th { position: sticky; top: 0; background: var(--navy-2); color: #fff; text-align: left; font-size: 12px; }
