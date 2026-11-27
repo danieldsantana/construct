@@ -240,7 +240,6 @@ function PlanilhaEntrada({ pares, recebimentos, aoAbrir, aoAbrirNF }: {
   return (
     <>
       <div className="toolbar">
-        <span className="muted">{colunas.length} recebimentos (todos), {varios ? 'na ordem de recebimento' : 'na ordem do controle'} · itens com previsto ou recebimento</span>
         <span className="grow" /><ResumoSelecao refSpan={cruz.resumoRef} />
       </div>
       <div className="panel planilha" style={{ overflow: 'auto', maxHeight: 'calc(100vh - 300px)' }}>
@@ -300,7 +299,7 @@ function ItensDosMovimentos({ movimentos }: { movimentos: Recebimento[] }) {
       .map((l) => ({ q: Number(l.quantidade), mov: ids.get(l.movimento_id)!, m: mat.get(`${l.linha_id}|${l.canteiro_id}|${l.material_id}`) }))
       .sort((a, b) => (a.m?.ordem ?? 0) - (b.m?.ordem ?? 0));
   }, [movimentos, saldos.dados, lanc.dados]);
-  if (!movimentos.length) return <p className="muted" style={{ margin: 0 }}>Ainda não recebida: nenhum item lançado. Os itens do romaneio (lidos do PDF) entram numa próxima etapa.</p>;
+  if (!movimentos.length) return <p className="muted" style={{ margin: 0 }}>Nenhum item lançado.</p>;
   let secao = '';
   const varios = movimentos.length > 1;
   return (
@@ -360,7 +359,6 @@ function FichaRecebimento({ r, aoFechar }: { r: Recebimento | null; aoFechar: ()
         <>
           {r.tipo === 'ajuste' && <div className="callout">Quantidade digitada na coluna E da ENTRADA (a coluna dos rótulos), sem NF nem data. A planilha conta como recebida; confira a qual recebimento pertence.</div>}
           <ItensDosMovimentos movimentos={[r]} />
-          <p className="muted" style={{ margin: 0, fontSize: 12.5 }}>Origem: {r.origem.replace('controle:', 'controle ').replace('#', ', coluna ')}</p>
         </>
       )}
     </Gaveta>
@@ -396,7 +394,6 @@ function RomaneioXLancado({ nfId, recebida }: { nfId: number; recebida: boolean 
           );
         })}</tbody>
       </table>
-      <p className="muted" style={{ fontSize: 12 }}>Só volumes de estrutura; fixadores avulsos e peças (POS) ainda sem de-para. "Sem ligação": volume cuja numeração/peso no controle não bate com a matriz.</p>
     </>
   );
 }

@@ -55,11 +55,6 @@ export function OFs() {
   return (
     <>
       <Titulo texto="OFs"><span className="num">{doEscopo.length} OFs · {num(prev / 1000, 1)} t</span></Titulo>
-      <div className="notes">
-        Fonte: resumo de OFs do cliente (OFs BRAMETAL). <b>Atendimento por peso</b> = peso das NFs recebidas que citam a OF ÷ peso da OF.
-        A OF da NF vem da linha "Ordem de Fabricação" dos controles do T4 ou, nas demais, do campo "OC:" do PDF da NF (os dois conferem onde existem juntos).
-        {' '}<b>Atendimento por componentes</b> = parte do peso da OF em componentes completos, formados só com os volumes das NFs da OF (volumes de uma parte que vieram por OFs diferentes não completam nenhuma das duas). Para-raios "1 TORRE" = 2 peças/conjuntos; stub = 1 por perna.
-      </div>
       {(naoRec > 0 || semCtrl > 0) && (
         <div className="callout">
           NFs emitidas destas OFs que não aparecem como recebidas: <b>{naoRec}</b> não recebida(s) no canteiro de destino
@@ -177,7 +172,6 @@ export function FichaOF({ o, comps, itens, nfs, aoFechar }: { o: OF | null; comp
                     })}
                   </tbody>
                 </table>
-                <p className="muted" style={{ fontSize: 12, margin: '6px 0 0' }}>Peso só das NFs recebidas (vem do controle). NF não recebida não tem peso lido ainda.</p>
               </>
             ) : <p className="muted">Nenhuma NF cita esta OF.</p>}
           </section>

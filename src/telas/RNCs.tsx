@@ -57,11 +57,6 @@ export function RNCs() {
   return (
     <>
       <Titulo texto="RNCs"><span className="num">{comRnc.length} RNCs · {semRnc.length} SACs sem RNC</span></Titulo>
-      <div className="notes">
-        Fonte: NFs de reposição (SAC e RNC do nome do PDF, iguais ao campo "OC:" do DANFE). Uma RNC pode ter vários SACs e várias NFs,
-        e um SAC pode citar várias RNCs — a tabela mostra todos. A coluna "Lançadas" diz quantas dessas NFs aparecem num controle de
-        estruturas (em geral os controles não lançam reposições). Situação da RNC (aberta, parcial, fechada) entra com o registro próprio.
-      </div>
       <section className="panel" style={{ marginBottom: 12 }}>
         <div className="tramo-h"><b>RNCs</b><span className="muted">{comRnc.length}</span></div>
         <Tabela grupos={comRnc} sel={sel} abrir={abrir} todos={dados.dados} />
@@ -142,7 +137,6 @@ export function Ficha({ g, todos, aoFechar }: { g: Grupo | null; todos: RncNF[];
               </tbody>
             </table>
           </section>
-          <div className="callout">Itens da RNC (peças, torres), SAC aberto/fechado e baixa da reposição entram quando fizermos o registro próprio de RNC.</div>
         </>
       )}
     </Gaveta>

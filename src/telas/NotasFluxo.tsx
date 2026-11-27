@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react';
 import { useEditor } from '../lib/sessao';
 import { useEscopo } from '../lib/escopo';
-import { data, num } from '../lib/formato';
+import { num } from '../lib/formato';
 import {
   confirmarNF, desfazerRecebimento, marcarRecebida, salvarNF, useNFItens, usePendencias, useSaldos,
   type NotaFiscal, type PendenciaNova,
@@ -66,7 +66,7 @@ export function AcoesNF({ nf }: { nf: NotaFiscal }) {
         <div className="acoes-nf">
           {nf.situacao_exibida !== 'confirmada' && nf.situacao_exibida !== 'em_conferencia' && (
             meus.length === 0
-              ? <p className="muted">Sem itens lançados: lance a NF pelo PDF ou na aba "Lançar NF" antes de marcar como recebida.</p>
+              ? <p className="muted">Sem itens lançados.</p>
               : (
                 <div className="linha-acao">
                   <b>Pátio informou o recebimento?</b>
@@ -88,7 +88,6 @@ export function AcoesNF({ nf }: { nf: NotaFiscal }) {
               </div>
               {comPend && (
                 <div className="pend-form">
-                  <p className="muted" style={{ margin: '0 0 6px' }}>O que faltou ou veio avariado sai do recebido até a reposição. RNC e SAC você completa depois.</p>
                   <table>
                     <thead><tr><th>Tipo</th><th>Item da NF</th><th>Peça / descrição</th><th className="r">Qtd.</th><th>Motivo</th><th>Observação</th><th /></tr></thead>
                     <tbody>{linhas.map((l, i) => {
@@ -192,7 +191,6 @@ export function LancarNF() {
           </table>
         </div>
       )}
-      <p className="muted" style={{ fontSize: 12.5 }}>Mesma ordem e seções da ENTRADA do controle. Previsto e recebido do canteiro para referência; recebido só conta NF conferida. Data de emissão: {data(cab.emissao || null)}.</p>
     </div>
   );
 }

@@ -81,23 +81,19 @@ export function Inicio() {
   return (
     <>
       <Titulo texto="Início" />
-      <div className="notes">
-        Junta o que hoje está espalhado em TABELAS, VOLUMES RECEBIDOS, RESUMO DE FIXADORES e na pasta de NFs, sempre no escopo escolhido acima.
-        Cada linha leva ao detalhe.
-      </div>
       <div className="today">
         <div className="card">
           <div className="card-h"><span className="big">{naoRec.length}</span><b>NFs emitidas e não recebidas</b></div>
           <ul>{naoRec.slice(0, 7).map((x) => li(x.id, <>NF {x.numero} · emitida {data(x.emissao)} · {x.local_entrega ?? '—'}</>,
             <span className="warn">{dias(x.emissao)} dias</span>, `/notas?filtro=nao_recebida&nf=${x.id}`)) }{mais(naoRec.length, '/notas?filtro=nao_recebida')}{naoRec.length === 0 && nada}</ul>
-          <div className="foot"><Link to="/notas?filtro=nao_recebida">Ver todas</Link> <span className="muted">· origem: PDFs recebidos por e-mail × controles</span></div>
+          <div className="foot"><Link to="/notas?filtro=nao_recebida">Ver todas</Link></div>
         </div>
 
         <div className="card">
           <div className="card-h"><span className="big">{emConf.length}</span><b>Recebidas, em conferência</b></div>
           <ul>{emConf.slice(0, 7).map((x) => li(x.id, <>NF {x.numero} · {x.of_texto ? ofTxt(x.of_texto) : '—'} · {x.local_entrega}</>,
             `recebida ${data(x.recebida_em)}`, `/notas?filtro=em_conferencia&nf=${x.id}`))}{mais(emConf.length, '/notas?filtro=em_conferencia')}{emConf.length === 0 && nada}</ul>
-          <div className="foot"><Link to="/notas?filtro=em_conferencia">Abrir</Link> <span className="muted">· lançadas aqui, ainda sem confirmação</span></div>
+          <div className="foot"><Link to="/notas?filtro=em_conferencia">Abrir</Link></div>
         </div>
 
         <div className="card">
@@ -108,7 +104,7 @@ export function Inicio() {
               <tr key={t}><td>{t}</td><td className="r num">{a.prev}</td><td className="r num">{a.comp}</td><td><Porcentagem valor={a.prev ? a.comp / a.prev : 0} ok={a.comp >= a.prev} /></td></tr>
             ))}</tbody>
           </table>
-          <div className="foot"><Link to="/mapa">Ver mapa de estruturas</Link> <span className="muted">· status automático: estrutura pela Lista, fixadores a granel só para torres com estrutura completa</span></div>
+          <div className="foot"><Link to="/mapa">Ver mapa de estruturas</Link></div>
         </div>
 
         <div className="card">
@@ -122,21 +118,19 @@ export function Inicio() {
               </tr>
             ))}</tbody>
           </table>
-          <div className="foot"><Link to="/ofs">Ver OFs</Link> <span className="muted">· peso das NFs recebidas e peso em componentes completos</span></div>
+          <div className="foot"><Link to="/ofs">Ver OFs</Link></div>
         </div>
 
         <div className="card">
           <div className="card-h"><span className="big">{limita.length}</span><b>Partes que mais limitam</b></div>
           <ul>{limita.slice(0, 7).map((p, i) => li(i, <>{p.tipo} · {p.parte} <span className="muted">· {p.canteiro}</span></>,
             `${num(p.conjunto)} de ${num(p.previsto)}`, '/estoque'))}{mais(limita.length, '/estoque?falta=1')}{limita.length === 0 && nada}</ul>
-          <div className="foot"><span className="muted">conjunto completo do estoque (inclui lançamentos feitos aqui)</span></div>
         </div>
 
         <div className="card">
           <div className="card-h"><b>Fixadores com menor atendimento</b></div>
           <ul>{fixadores.slice(0, 7).map(({ s, pct }) => li(`${s.linha_id}-${s.canteiro_id}-${s.material_id}`,
             <>{s.descricao} <span className="muted">· {s.canteiro}</span></>, `${num(pct * 100)}%`, '/estoque'))}{mais(fixadores.length, '/estoque?aba=fixadores&falta=1')}{fixadores.length === 0 && nada}</ul>
-          <div className="foot"><span className="muted">recebido ÷ previsto da ENTRADA · origem: controles</span></div>
         </div>
       </div>
     </>

@@ -360,10 +360,8 @@ export function FichaTorre({ t, cores, aoFechar }: { t: Torre | null; cores: Map
                 </tbody>
               </table>
             ) : <p className="muted">Controle deste canteiro ainda não importado.</p>}
-            {t.fonte && <p className="muted" style={{ fontSize: 12, margin: '6px 0 0' }}>Fonte: aba {abaDaFonte(t.fonte)} do controle</p>}
           </section>
           <FixadoresDaTorre t={t} />
-          <p className="muted" style={{ fontSize: 12.5, margin: 0 }}>Verde = o conjunto completo em estoque chega até esta torre na sequência de ataque; vermelho = ainda não. Situações da torre (zerada, pré-montagem…) entram quando definirmos as regras.</p>
         </>
       )}
     </Gaveta>
@@ -384,7 +382,7 @@ function classeCor(p: TorreComponente | undefined) {
 function FixadoresDaTorre({ t }: { t: Torre }) {
   const falta = useFixadoresFaltando(t.status === 'Entregue' || t.status === 'SF' ? t.id : null);
   if (t.status !== 'Entregue' && t.status !== 'SF') {
-    return <p className="muted" style={{ fontSize: 12.5, margin: 0 }}>Fixadores: só são reservados para torres com a estrutura completa.</p>;
+    return null;
   }
   return (
     <section>

@@ -187,7 +187,6 @@ export function Fixadores({ fixadores, varios, soFalta, mudar }: { fixadores: Sa
   return (
     <>
       <div className="toolbar">
-        <span className="muted" style={{ fontSize: 13 }}>Previsto = coluna PREVISTO da ENTRADA (nos fixadores a granel já inclui os 5%). Peso dos fixadores ainda não importado.</span>
         <span className="grow" />
         <label className="muted" style={{ fontSize: 13, display: 'flex', gap: 6, alignItems: 'center' }}>
           <input type="checkbox" checked={soFalta} onChange={(e) => mudar('falta', e.target.checked ? '1' : '')} /> Só o que falta
