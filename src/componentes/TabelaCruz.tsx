@@ -25,6 +25,25 @@ export function useTabelaCruz({ cruz = true, referencia = '' }: { cruz?: boolean
     const tr = td?.parentElement as HTMLTableRowElement | undefined;
     return td && tr?.dataset.k && td.closest('table') === ref.current ? td : null;
   };
+  // rola o contêiner para a célula ficar à vista, descontando o cabeçalho e as colunas congeladas (sticky)
+  const mostrar = (td: HTMLTableCellElement | null) => {
+    if (!td) return;
+    let box: HTMLElement | null = td.parentElement;
+    while (box && !(box.scrollHeight > box.clientHeight || box.scrollWidth > box.clientWidth) ) box = box.parentElement;
+    if (!box || typeof td.getBoundingClientRect !== 'function') return;
+    const b = box.getBoundingClientRect(), c = td.getBoundingClientRect();
+    const cab = ref.current?.tHead?.getBoundingClientRect();
+    const topoLivre = cab ? Math.max(b.top, cab.bottom) : b.top;
+    let esqLivre = b.left;
+    for (const x of (td.parentElement as HTMLTableRowElement).cells) {
+      if (x === td) break;
+      if (getComputedStyle(x).position === 'sticky') esqLivre = Math.max(esqLivre, x.getBoundingClientRect().right);
+    }
+    if (c.top < topoLivre) box.scrollTop -= topoLivre - c.top;
+    else if (c.bottom > b.bottom - 14) box.scrollTop += c.bottom - b.bottom + 14;
+    if (c.left < esqLivre) box.scrollLeft -= esqLivre - c.left;
+    else if (c.right > b.right - 14) box.scrollLeft += c.right - b.right + 14;
+  };
   const tdEm = (ls: HTMLTableRowElement[], p: Pos) => {
     const tr = ls[p.r];
     return tr ? tr.cells[Math.min(p.c, tr.cells.length - 1)] ?? null : null;
@@ -136,13 +155,30 @@ export function useTabelaCruz({ cruz = true, referencia = '' }: { cruz?: boolean
       if (!ls.length) return;
       const a = ativo.current;
       const ctrl = e.ctrlKey || e.metaKey;
-      let r = a.r, c = a.c;
-      if (dir[0]) r = ctrl ? (dir[0] < 0 ? 0 : ls.length - 1) : Math.max(0, Math.min(ls.length - 1, r + dir[0]));
-      if (dir[1]) {
-        const ult = (ls[r]?.cells.length ?? 1) - 1;
-        c = ctrl ? (dir[1] < 0 ? 0 : ult) : Math.max(0, Math.min(ult, c + dir[1]));
+      const passo = (q: Pos): Pos | null => {
+        const n = { r: q.r + dir[0], c: q.c + dir[1] };
+        if (n.r < 0 || n.r >= ls.length || n.c < 0 || n.c >= (ls[n.r]?.cells.length ?? 0)) return null;
+        return n;
+      };
+      let novo: Pos = { r: a.r, c: Math.min(a.c, (ls[a.r]?.cells.length ?? 1) - 1) };
+      if (!ctrl) {
+        novo = passo(novo) ?? novo;
+      } else {
+        // como no Excel: com valor na próxima, vai até o último valor antes de um vazio; senão, até o próximo valor (ou a borda)
+        const cheia = (q: Pos) => { const t = (tdEm(ls, q)?.textContent ?? '').trim(); return t !== '' && t !== '-' && t !== '—'; };
+        const prox = passo(novo);
+        if (prox) {
+          if (cheia(novo) && cheia(prox)) {
+            let q = prox;
+            for (let n = passo(q); n && cheia(n); n = passo(q)) q = n;
+            novo = q;
+          } else {
+            let q = prox;
+            while (!cheia(q)) { const n = passo(q); if (!n) break; q = n; }
+            novo = q;
+          }
+        }
       }
-      const novo = { r, c };
       ativo.current = novo;
       if (e.shiftKey && ancora.current) {
         sel.current = retangulo(ancora.current, novo);
@@ -152,7 +188,7 @@ export function useTabelaCruz({ cruz = true, referencia = '' }: { cruz?: boolean
         sel.current = td ? new Set([chave(td)]) : new Set();
       }
       aplicar();
-      tdEm(ls, novo)?.scrollIntoView?.({ block: 'nearest', inline: 'nearest' });
+      mostrar(tdEm(ls, novo));
     };
     window.addEventListener('mouseup', fim);
     window.addEventListener('keydown', tecla);
