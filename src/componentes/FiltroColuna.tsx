@@ -2,8 +2,9 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 
 // Filtro de coluna no estilo do autofiltro do Excel: ▾ no título; lista dos valores da coluna com caixas de marcação,
 // busca e "Selecionar tudo". selecionados = null significa sem filtro (todos).
-export function FiltroColuna({ titulo, valores, selecionados, aoMudar }: {
+export function FiltroColuna({ titulo, valores, selecionados, aoMudar, ordem }: {
   titulo: string; valores: string[]; selecionados: Set<string> | null; aoMudar: (s: Set<string> | null) => void;
+  ordem?: (a: string, b: string) => number;
 }) {
   const [aberto, setAberto] = useState(false);
   const [busca, setBusca] = useState('');
@@ -11,8 +12,8 @@ export function FiltroColuna({ titulo, valores, selecionados, aoMudar }: {
   const contagem = useMemo(() => {
     const m = new Map<string, number>();
     for (const v of valores) m.set(v, (m.get(v) ?? 0) + 1);
-    return [...m].sort((a, b) => a[0].localeCompare(b[0], 'pt-BR', { numeric: true }));
-  }, [valores]);
+    return [...m].sort((a, b) => (ordem ? ordem(a[0], b[0]) : a[0].localeCompare(b[0], 'pt-BR', { numeric: true })));
+  }, [valores, ordem]);
   useEffect(() => {
     if (!aberto) return;
     const fora = (e: MouseEvent) => { if (!ref.current?.contains(e.target as Node)) setAberto(false); };

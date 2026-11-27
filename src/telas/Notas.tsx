@@ -84,30 +84,34 @@ export function Notas() {
     return f === 'recebidas' ? s === 'confirmada' || s === 'em_conferencia' : s === f;
   };
   // filtros de coluna (autofiltro): valor da célula de cada coluna filtrável
-  type Col = 'situacao' | 'of' | 'destino' | 'canteiro';
+  type Col = 'situacao' | 'nf' | 'emissao' | 'recebida' | 'of' | 'destino' | 'canteiro';
   const valorCol = (l: Linha, c: Col): string => {
     if (l.k === 'nf') {
       if (c === 'situacao') return SITUACAO[l.nf.situacao_exibida][0];
+      if (c === 'nf') return l.nf.numero;
+      if (c === 'emissao') return data(l.nf.emissao) || '—';
+      if (c === 'recebida') return data(l.nf.recebida_em) || '—';
       if (c === 'of') return l.nf.of_texto ?? '—';
       if (c === 'destino') return l.nf.destino ?? '—';
       return l.nf.canteiro_recebimento ?? '—';
     }
     if (c === 'situacao') return l.mov.tipo === 'ajuste' ? 'Ajuste' : 'Transferência';
+    if (c === 'nf') return l.mov.documento ?? '—';
+    if (c === 'recebida') return data(l.mov.data) || '—';
     return c === 'canteiro' ? l.mov.canteiro : '—';
   };
+  const ordemData = (a: string, b: string) => a.split('/').reverse().join('').localeCompare(b.split('/').reverse().join(''));
   const [filtrosCol, setFiltrosCol] = useState<Partial<Record<Col, Set<string> | null>>>({});
-  const [buscaNF, setBuscaNF] = useState('');
   const doChip = useMemo(() => linhas.filter((l) => passa(l, filtro)),
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [linhas, filtro]);
   const visiveis = useMemo(() => doChip
     .filter((l) => (Object.entries(filtrosCol) as [Col, Set<string> | null][]).every(([c, sel]) => !sel || sel.has(valorCol(l, c))))
-    .filter((l) => !buscaNF.trim() || (l.k === 'nf' ? l.nf.numero : l.mov.documento ?? '').includes(buscaNF.trim()))
     .sort((a, b) => b.quando.localeCompare(a.quando)),
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [doChip, filtrosCol, buscaNF]);
-  const fc = (c: Col, titulo: string) => (
-    <FiltroColuna titulo={titulo} valores={doChip.map((l) => valorCol(l, c))} selecionados={filtrosCol[c] ?? null}
+    [doChip, filtrosCol]);
+  const fc = (c: Col, titulo: string, ordem?: (a: string, b: string) => number) => (
+    <FiltroColuna titulo={titulo} valores={doChip.map((l) => valorCol(l, c))} selecionados={filtrosCol[c] ?? null} ordem={ordem}
                   aoMudar={(sel) => setFiltrosCol((f) => ({ ...f, [c]: sel }))} />
   );
 
@@ -136,8 +140,8 @@ export function Notas() {
             <table>
               <thead><tr>
                 <th>{fc('situacao', 'Situação')}</th>
-                <th><span className="filtro-col">NF / documento <input className="fc-busca" placeholder="buscar" value={buscaNF} onChange={(e) => setBuscaNF(e.target.value.replace(/\D/g, ''))} /></span></th>
-                <th>Emissão</th><th>Recebida em</th><th className="r">Dias</th><th>{fc('of', 'OF')}</th>
+                <th>{fc('nf', 'NF / documento')}</th>
+                <th>{fc('emissao', 'Emissão', ordemData)}</th><th>{fc('recebida', 'Recebida em', ordemData)}</th><th className="r">Dias</th><th>{fc('of', 'OF')}</th>
                 <th>{fc('destino', 'Destino (NF)')}</th><th>{fc('canteiro', 'Canteiro')}</th><th className="r">Peso (kg)</th><th className="r">Itens</th><th>Observações</th>
               </tr></thead>
               <tbody>
