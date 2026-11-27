@@ -436,3 +436,5 @@ body:has(.lancar.conteudo) .scopebar button.on { background: transparent; color:
 .lancar-grade.planilha td:has(> input.qtd) { padding: 0; }
 .titulo .titulo-slot label.chk select { margin-left: 6px; color: var(--ink); }
 body:has(.lancar.conteudo) .notas-tela .titulo .sub { display: none; }
+.titulo .titulo-slot label.chk { display: flex; flex-direction: row; align-items: center; gap: 6px; white-space: nowrap; }
+.titulo .titulo-slot label.chk select { margin: 0; width: auto; }

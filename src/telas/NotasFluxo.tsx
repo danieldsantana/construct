@@ -209,7 +209,7 @@ export function LancarNF({ slot }: { slot: HTMLElement | null }) {
             <option value="">—</option>{linhas.dados.map((l) => <option key={l.sigla} value={l.sigla}>{l.codigo} - {l.sigla}</option>)}</select></label>
           <label>Canteiro de destino <select value={destino} disabled={!linha} onChange={(e) => { setDestino(e.target.value); setQtd({}); setTipo(""); setFiltroDesc(null); }}>
             <option value="">—</option>{canteiros.map((c) => <option key={c}>{c}</option>)}
-            {outros.length > 0 && <optgroup label="Fora do trecho">{outros.map((c) => <option key={c}>{c}</option>)}</optgroup>}</select></label>
+            {outros.length > 0 && <option disabled>──────────</option>}{outros.map((c) => <option key={c}>{c}</option>)}</select></label>
           <label>OF <select value={cab.of} disabled={!linha} onChange={(e) => setCab({ ...cab, of: e.target.value })}>
             <option value="">—</option>{ofsLinha.map((o) => <option key={o.id} value={o.codigo}>{[ofCurta(o), o.canteiro].filter(Boolean).join(' · ')}</option>)}</select></label>
           <label>Valor NF <span className="campo-pre"><i>R$</i><input value={cab.valor} inputMode="decimal" onChange={(e) => setCab({ ...cab, valor: numeroBR(e.target.value, 2) })} /></span></label>
