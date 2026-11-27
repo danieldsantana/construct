@@ -275,7 +275,7 @@ function PlanilhaEntrada({ slot, pares, recebimentos, aoAbrir, aoAbrirNF }: {
     )],
     ['Recebimento', (c) => data(c.data)],
     ['Emissão', (c) => (c.emissao ? data(c.emissao) : '')],
-    ['Romaneio', (c) => c.romaneio ?? ''],
+    ['Remessa', (c) => c.romaneio ?? ''],
   ];
   const linhasItens = soRecebidos ? itens.filter((i) => i.recebido !== 0) : itens;
   let secao = '';
@@ -377,7 +377,7 @@ function FichaNF({ nf, recebimentos, aoFechar }: { nf: NotaFiscal | null; recebi
           {nf.destino && nf.canteiro_recebimento && nf.destino !== nf.canteiro_recebimento && <div className="callout">Destino na NF: {nf.destino}. Recebida em {nf.canteiro_recebimento}.</div>}
           <div className="fields">
             <div><span>Destino (NF)</span><b>{nf.destino ?? '—'}</b></div>
-            <div><span>Romaneio</span><b>{nf.romaneio ?? '—'}</b></div>
+            <div><span>Remessa</span><b>{nf.romaneio ?? '—'}</b></div>
             <div><span>Valor</span><b>{nf.valor ? `R$ ${num(nf.valor, 2)}` : '—'}</b></div>
             <div><span>SAC / RNC</span><b>{[nf.sac && `SAC ${nf.sac}`, nf.rnc && `RNC ${nf.rnc}`].filter(Boolean).join(' · ') || '—'}</b></div>
             <div style={{ gridColumn: '1 / -1' }}><span>Arquivo</span><b style={{ fontSize: 13 }}>{nf.arquivo ?? 'sem PDF no índice'}</b></div>
@@ -415,17 +415,17 @@ function RomaneioXLancado({ nfId, recebida }: { nfId: number; recebida: boolean 
   const l = leitura.dados.find((x) => x.id === nfId);
   const linhas = conf.dados.filter((c) => c.nota_fiscal_id === nfId).sort((a, b) => (a.volume ?? '~').localeCompare(b.volume ?? '~'));
   if (conf.carregando || leitura.carregando) return null;
-  if (!l || l.romaneio_confere === null) return <p className="muted" style={{ fontSize: 13 }}>Romaneio: PDF não lido.</p>;
-  if (!l.romaneio_confere) return <p className="muted" style={{ fontSize: 13 }}>Romaneio do PDF não conferido ({l.romaneio_obs}); sem comparação.</p>;
+  if (!l || l.romaneio_confere === null) return <p className="muted" style={{ fontSize: 13 }}>Remessa: PDF não lido.</p>;
+  if (!l.romaneio_confere) return <p className="muted" style={{ fontSize: 13 }}>Remessa do PDF não conferida ({l.romaneio_obs}); sem comparação.</p>;
   const difs = linhas.filter((c) => Number(c.qtd_romaneio) !== Number(c.qtd_lancada));
   return (
     <>
-      <h2>Romaneio × lançado</h2>
+      <h2>Remessa × lançado</h2>
       {!recebida
-        ? <p className="muted" style={{ fontSize: 13 }}>Romaneio lido e conferido com o peso{l.peso_danfe ? ` do DANFE (${num(l.peso_danfe, 1)} kg)` : ''}; a NF ainda não foi lançada.</p>
-        : <div className={difs.length ? 'callout' : 'notes'}>{difs.length ? `${difs.length} volume(s) com diferença entre o romaneio e o lançado.` : 'Lançado igual ao romaneio em todos os volumes.'}</div>}
+        ? <p className="muted" style={{ fontSize: 13 }}>Remessa lida e conferida com o peso{l.peso_danfe ? ` do DANFE (${num(l.peso_danfe, 1)} kg)` : ''}; a NF ainda não foi lançada.</p>
+        : <div className={difs.length ? 'callout' : 'notes'}>{difs.length ? `${difs.length} volume(s) com diferença entre a remessa e o lançado.` : 'Lançado igual à remessa em todos os volumes.'}</div>}
       <table>
-        <thead><tr><th>Volume (matriz)</th><th className="r">Romaneio</th><th className="r">Lançado</th></tr></thead>
+        <thead><tr><th>Volume (matriz)</th><th className="r">Remessa</th><th className="r">Lançado</th></tr></thead>
         <tbody>{linhas.map((c, i) => {
           const dif = Number(c.qtd_romaneio) !== Number(c.qtd_lancada);
           return (

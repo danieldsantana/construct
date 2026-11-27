@@ -6,6 +6,7 @@ import {
   confirmarNF, desfazerRecebimento, marcarRecebida, salvarNF, useNFItens, usePendencias, useSaldos,
   type NotaFiscal, type PendenciaNova,
 } from '../dados/recebimento';
+import { useOFs } from '../dados/ofs';
 
 const hoje = () => new Date().toISOString().slice(0, 10);
 const n = (v: number | string | null | undefined) => Number(v ?? 0);
@@ -122,6 +123,15 @@ export function AcoesNF({ nf }: { nf: NotaFiscal }) {
   );
 }
 
+// digitação de número no formato brasileiro: ponto no milhar, vírgula no decimal
+function numeroBR(texto: string, casas: number): string {
+  const limpo = texto.replace(/[^\d,]/g, '');
+  const [int, ...resto] = limpo.split(',');
+  const milhar = int.replace(/^0+(?=\d)/, '').replace(/\B(?=(\d{3})+(?!\d))/g, '.');
+  return resto.length ? `${milhar},${resto.join('').slice(0, casas)}` : milhar;
+}
+const deBR = (texto: string) => texto.replace(/\./g, '').replace(',', '.');
+
 // ---------- Lançar NF manualmente: uma "coluna da ENTRADA" (cabeçalho + quantidade por item, na ordem do controle) ----------
 export function LancarNF() {
   const editor = useEditor();
@@ -137,6 +147,8 @@ export function LancarNF() {
   const canteiros = useMemo(() => [...new Set(saldos.dados.filter((s) => s.linha === linha && n(s.previsto) > 0).map((s) => s.canteiro))], [saldos.dados, linha]);
   const itens = useMemo(() => saldos.dados.filter((s) => s.linha === linha && s.canteiro === destino && n(s.previsto) > 0).sort((a, b) => a.ordem - b.ordem),
     [saldos.dados, linha, destino]);
+  const ofs = useOFs();
+  const ofsLinha = useMemo(() => ofs.dados.filter((o) => o.linha === linha).sort((a, b) => (a.numero ?? 0) - (b.numero ?? 0)), [ofs.dados, linha]);
   const peso = itens.reduce((s, i) => s + n(qtd[i.material_id]) * n(i.peso_unit), 0);
   const preenchidos = itens.filter((i) => n(qtd[i.material_id]) !== 0);
 
@@ -144,7 +156,7 @@ export function LancarNF() {
   const salvar = async () => {
     setOcupado(true); setMsg(null);
     try {
-      await salvarNF({ ...cab, linha, destino, lancamento: 'manual', itens: preenchidos.map((i) => ({ material_id: i.material_id, quantidade: n(qtd[i.material_id]) })) });
+      await salvarNF({ ...cab, valor: deBR(cab.valor), peso: deBR(cab.peso), linha, destino, lancamento: 'manual', itens: preenchidos.map((i) => ({ material_id: i.material_id, quantidade: n(qtd[i.material_id]) })) });
       setMsg(`NF ${cab.numero} lançada como emitida (${preenchidos.length} itens). Quando o pátio informar, marque como recebida na ficha da NF.`);
       setCab({ numero: '', emissao: '', of: '', romaneio: '', valor: '', peso: '' }); setQtd({});
     } catch (e) { setMsg(`Não foi possível: ${(e as Error).message}`); } finally { setOcupado(false); }
@@ -156,17 +168,18 @@ export function LancarNF() {
         <div className="campos">
           <label>Nota fiscal <input value={cab.numero} inputMode="numeric" onChange={(e) => setCab({ ...cab, numero: e.target.value.replace(/\D/g, '') })} /></label>
           <label>Data de emissão <input type="date" value={cab.emissao} onChange={(e) => setCab({ ...cab, emissao: e.target.value })} /></label>
-          <label>OF <input value={cab.of} placeholder="OF-71607-EM-BRM-114" onChange={(e) => setCab({ ...cab, of: e.target.value })} /></label>
-          <label>Romaneio <input value={cab.romaneio} onChange={(e) => setCab({ ...cab, romaneio: e.target.value })} /></label>
-          <label>Valor NF <input value={cab.valor} inputMode="decimal" onChange={(e) => setCab({ ...cab, valor: e.target.value.replace(',', '.') })} /></label>
-          <label>Peso NF (kg) <input value={cab.peso} inputMode="decimal" onChange={(e) => setCab({ ...cab, peso: e.target.value.replace(',', '.') })} /></label>
+          <label>OF <input value={cab.of} list="ofs-linha" onChange={(e) => setCab({ ...cab, of: e.target.value })} />
+            <datalist id="ofs-linha">{ofsLinha.map((o) => <option key={o.id} value={o.codigo}>{[o.canteiro, o.entrega_texto].filter(Boolean).join(' · ')}</option>)}</datalist></label>
+          <label>Remessa <input value={cab.romaneio} onChange={(e) => setCab({ ...cab, romaneio: e.target.value })} /></label>
+          <label>Valor NF <span className="campo-pre"><i>R$</i><input value={cab.valor} inputMode="decimal" onChange={(e) => setCab({ ...cab, valor: numeroBR(e.target.value, 2) })} /></span></label>
+          <label>Peso NF (kg) <input value={cab.peso} inputMode="decimal" onChange={(e) => setCab({ ...cab, peso: numeroBR(e.target.value, 3) })} /></label>
           <label>Linha <select value={linha} onChange={(e) => { setLinha(e.target.value); setDestino(''); setQtd({}); }}><option>T3</option><option>T4</option></select></label>
           <label>Canteiro de destino <select value={destino} onChange={(e) => { setDestino(e.target.value); setQtd({}); }}>
             <option value="">—</option>{canteiros.map((c) => <option key={c}>{c}</option>)}</select></label>
         </div>
         <div className="linha-acao" style={{ marginTop: 8 }}>
-          <span className="num">Peso pelos itens: <b>{num(peso, 1)} kg</b>{cab.peso && <> · NF: <b>{num(Number(cab.peso), 1)} kg</b>
-            {Math.abs(peso - Number(cab.peso)) > 1 && <span className="warn"> (diferença {num(peso - Number(cab.peso), 1)} kg — fixadores sem peso cadastrado não entram)</span>}</>}</span>
+          <span className="num">Peso pelos itens: <b>{num(peso, 1)} kg</b>{cab.peso && <> · NF: <b>{num(Number(deBR(cab.peso)), 1)} kg</b>
+            {Math.abs(peso - Number(deBR(cab.peso))) > 1 && <span className="warn"> (diferença {num(peso - Number(deBR(cab.peso)), 1)} kg — fixadores sem peso cadastrado não entram)</span>}</>}</span>
           <span className="grow" />
           <button className="pri" disabled={ocupado || !cab.numero || !destino || !preenchidos.length} onClick={salvar}>Lançar como emitida</button>
         </div>

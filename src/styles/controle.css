@@ -403,3 +403,8 @@ main:has(> .notas-tela.cheia) { overflow: hidden; padding-bottom: 12px; display:
 .fc-pop .fc-lista span:first-of-type { flex: 1; overflow: hidden; text-overflow: ellipsis; }
 .fc-pop .n { color: var(--muted); font-size: 11.5px; }
 .fc-pop .fc-tudo { font-weight: 600; }
+
+/* campo com prefixo (R$) */
+.campo-pre { display: flex; align-items: center; border: 1px solid var(--line); background: #fff; border-radius: 3px; }
+.campo-pre i { font-style: normal; color: var(--muted); padding: 0 2px 0 8px; }
+.campo-pre input { border: 0 !important; flex: 1; min-width: 0; }
