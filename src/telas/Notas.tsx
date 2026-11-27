@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { useSearchParams } from 'react-router';
 import { Abas, Titulo } from '../componentes/Titulo';
 import { Gaveta } from '../componentes/Gaveta';
@@ -169,7 +169,30 @@ function PlanilhaEntrada({ pares, recebimentos, aoAbrir, aoAbrirNF }: {
   const saldos = useSaldos();
   const lanc = useLancamentos();
   const [todas, setTodas] = useState(false);
+  const tabRef = useRef<HTMLTableElement>(null);
   const varios = pares.length > 1;
+  // congela como no Excel: as linhas do cabeçalho presas no topo e as 3 primeiras colunas presas à esquerda
+  useLayoutEffect(() => {
+    const t = tabRef.current;
+    if (!t?.tHead) return;
+    let top = 0;
+    for (const tr of t.tHead.rows) {
+      for (const c of tr.cells) { c.style.position = 'sticky'; c.style.top = `${top}px`; c.style.zIndex = '2'; }
+      top += tr.offsetHeight;
+    }
+    const tit = t.tHead.rows[t.tHead.rows.length - 1];
+    const w = [0, 1, 2].map((i) => tit.cells[i]?.offsetWidth ?? 0);
+    const esq = [0, w[0], w[0] + w[1]];
+    for (const tr of t.rows) {
+      for (let i = 0; i < 3 && i < tr.cells.length; i++) {
+        const c = tr.cells[i];
+        if (c.colSpan > 3) continue;
+        c.style.position = 'sticky'; c.style.left = `${esq[i]}px`;
+        c.style.zIndex = tr.parentElement === t.tHead ? '4' : '1';
+        if (i === 2) c.classList.add('ult-cong');
+      }
+    }
+  });
   const variasLinhas = new Set(pares.map((p) => p.linha)).size > 1;
   const pos = (l: string, c: string) => pares.findIndex((p) => p.linha === l && p.canteiro === c);
 
@@ -216,11 +239,11 @@ function PlanilhaEntrada({ pares, recebimentos, aoAbrir, aoAbrirNF }: {
         <button onClick={() => setTodas(!todas)}>{todas ? 'Só as 25 últimas' : 'Todas as colunas'}</button>
       </div>
       <div className="panel planilha" style={{ overflow: 'auto', maxHeight: 'calc(100vh - 300px)' }}>
-        <table>
+        <table ref={tabRef}>
           <thead>
             {cab.map(([rot, f], i) => (
               <tr key={rot} className={`cab ${rot === 'Canteiro' ? 'cab-cant' : ''}`}>
-                <th className="stk rot">{rot}</th><th /><th />
+                <th className="rot" colSpan={1}>{rot}</th><th className="vazio-cab" /><th className="vazio-cab" />
                 {mostrar.map((c, j) => {
                   const nova = varios && rot === 'Canteiro' && (j === 0 || mostrar[j - 1].canteiro !== c.canteiro || mostrar[j - 1].linha !== c.linha);
                   return <td key={c.id} className={`cabv ${i === cab.length - 1 ? 'ult' : ''} ${nova ? 'nova' : ''}`}>{f(c)}</td>;
@@ -228,8 +251,8 @@ function PlanilhaEntrada({ pares, recebimentos, aoAbrir, aoAbrirNF }: {
               </tr>
             ))}
             <tr className="tit">
-              <th className="stk">Descrição</th><th className="r">Previsto</th><th className="r">Recebido</th>
-              {mostrar.map((c) => <th key={c.id} className="nfcol" title={`${doc(c)} · ${c.canteiro}`} onClick={() => aoAbrir(c)}>{c.tipo === 'recebimento' ? 'NF' : c.tipo === 'ajuste' ? 'AJ.' : 'TR.'}</th>)}
+              <th>Descrição</th><th className="r">Previsto</th><th className="r">Recebido</th>
+              {mostrar.map((c) => <th key={c.id} className="colv" title={`${doc(c)} · ${c.canteiro}`} onClick={() => aoAbrir(c)} />)}
             </tr>
           </thead>
           <tbody>
@@ -237,12 +260,12 @@ function PlanilhaEntrada({ pares, recebimentos, aoAbrir, aoAbrirNF }: {
               const out = [];
               if (s.secao !== secao) {
                 secao = s.secao;
-                out.push(<tr key={`s${s.material_id}`} className="sec"><td colSpan={3 + mostrar.length}>{s.secao}</td></tr>);
+                out.push(<tr key={`s${s.material_id}`} className="sec"><td>{s.secao}</td><td /><td />{mostrar.length > 0 && <td colSpan={mostrar.length} />}</tr>);
               }
               const falta = s.recebido < s.previsto;
               out.push(
                 <tr key={s.material_id}>
-                  <td className="stk">{s.descricao}</td>
+                  <td className="desc">{s.descricao}</td>
                   <td className="r num prev">{num(s.previsto)}</td>
                   <td className={`r num rec ${falta ? 'warn' : ''}`}>{num(s.recebido)}</td>
                   {mostrar.map((c) => {
